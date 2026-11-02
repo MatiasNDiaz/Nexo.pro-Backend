@@ -13,5 +13,6 @@ Formato: contexto, decisión, consecuencias, fecha. Para cambiar una decisión s
 | [0006](0006-registro-en-dos-pasos.md)             | Registro en dos pasos; el número de DNI no se guarda                                |
 | [0007](0007-acceso-cuentas-suspendidas.md)        | Cuentas suspendidas/baneadas: solo motivo, apelación y logout                       |
 | [0008](0008-duracion-tokens-y-cookies.md)         | Duración de tokens y prefijo de cookies `nx_`                                       |
+| [0009](0009-limites-plan-premium.md)              | Premium: 5 imágenes y 2 videos (configurable)                                       |
 
 Las decisiones todavía abiertas están en [pendientes.md](pendientes.md).

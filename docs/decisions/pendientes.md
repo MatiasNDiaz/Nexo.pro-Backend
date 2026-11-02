@@ -9,7 +9,6 @@ Fuente: plan §4.2 y §4.3 más el análisis de la etapa 1. Se actualiza al cerr
 | ----------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------- |
 | C-03        | ¿Los clientes pagan algo alguna vez?                                    | Suscripciones solo para profesionales                                     | Etapa 9       |
 | C-04        | Cobro automático al fin de la prueba                                    | Sin cobro automático; checkout manual                                     | Etapa 9       |
-| C-05        | Límites de contenido Premium                                            | Valores en `subscription_plans`; confirmar números                        | Etapa 7       |
 | C-06        | Cuándo se puede reseñar                                                 | Ligada a una contratación aceptada o posterior                            | Etapa 10      |
 | C-07        | Clasificación de clientes (quién califica)                              | `customer_ratings` si la dan los profesionales; no exponer sin mínimos    | Etapa 10      |
 | C-08 / C-30 | Disponibilidad manual vs. automática; efecto de una contratación activa | Manual por defecto, automática opcional y apagada; sugerir "Trabajando"   | Etapas 7 y 8  |
@@ -30,21 +29,36 @@ Fuente: plan §4.2 y §4.3 más el análisis de la etapa 1. Se actualiza al cerr
 | C-29        | Sanción solo al perfil profesional                                      | Tipo de sanción `PROFILE_HIDDEN`                                          | Etapa 11      |
 | C-32        | Alcance del acceso del admin a chats                                    | Solo con reporte, auditado (legal)                                        | Etapa 11      |
 
-Resueltas: C-01 (ADR 0002), C-02 (ADR 0003, provisoria), C-15 (puerto 3001), C-26 (mail de consola), C-31 (ADR 0005), C-33 (ADR 0006), C-35 (ADR 0007). C-17, C-20, C-21 y C-22 son técnicas y se aplican como propone el plan. C-34 (admin único con MFA) se trata como riesgo en la etapa 5.
+Resueltas: C-01 (ADR 0002), C-02 (ADR 0003, provisoria), C-05 (ADR 0009), C-15 (puerto 3001), C-26 (mail de consola), C-31 (ADR 0005), C-33 (ADR 0006), C-35 (ADR 0007). C-17, C-20, C-21 y C-22 son técnicas y se aplican como propone el plan. C-34 (admin único con MFA) se trata como riesgo en la etapa 5.
 
 ## Decisiones pendientes
 
-| #           | Tema                                                  | Solución provisoria                            | Bloquea                |
-| ----------- | ----------------------------------------------------- | ---------------------------------------------- | ---------------------- |
-| P-04        | Máquina de estados de contrataciones                  | Propuesta FI §11.3 en tabla de transiciones    | Etapa 8                |
-| P-05        | Retención de chats                                    | No borrar                                      | Legal                  |
-| P-06 / P-07 | Débito automático, multa e interés                    | No implementar                                 | Etapa 9 / legal        |
-| P-08        | Política de sanciones                                 | Solo manual por el admin                       | Etapa 11               |
-| P-09 / P-10 | Clasificación de clientes y ranking                   | No exponer / orden provisional                 | Etapa 7 / 10           |
-| P-11        | Ubicación en tiempo real, "cerca de mí"               | Solo zona declarada                            | Etapa 7                |
-| P-12        | Proceso de cambio de rol                              | Solo por el admin, auditado                    | Etapa 6                |
-| P-13        | Marca definitiva                                      | Prefijo `nx_` (ADR 0008)                       | Producción             |
-| P-14        | Límites de archivos                                   | 5 MB imágenes, 30 MB / 15 s videos (a validar) | Etapa 7                |
-| P-15        | Canales externos de notificación                      | Solo internas + email de auth                  | Etapa 13               |
-| —           | Fuente oficial de localidades y barrios de Córdoba    | Pocos datos de ejemplo en desarrollo           | Etapa 4 (datos reales) |
-| —           | Proveedor de email transaccional y dominio (SPF/DKIM) | Adaptador de consola                           | Producción (ADR 0002)  |
+| #           | Tema                                                  | Solución provisoria                            | Bloquea               |
+| ----------- | ----------------------------------------------------- | ---------------------------------------------- | --------------------- |
+| P-04        | Máquina de estados de contrataciones                  | Propuesta FI §11.3 en tabla de transiciones    | Etapa 8               |
+| P-05        | Retención de chats                                    | No borrar                                      | Legal                 |
+| P-06 / P-07 | Débito automático, multa e interés                    | No implementar                                 | Etapa 9 / legal       |
+| P-08        | Política de sanciones                                 | Solo manual por el admin                       | Etapa 11              |
+| P-09 / P-10 | Clasificación de clientes y ranking                   | No exponer / orden provisional                 | Etapa 7 / 10          |
+| P-11        | Ubicación en tiempo real, "cerca de mí"               | Solo zona declarada                            | Etapa 7               |
+| P-12        | Proceso de cambio de rol                              | Solo por el admin, auditado                    | Etapa 6               |
+| P-13        | Marca definitiva                                      | Prefijo `nx_` (ADR 0008)                       | Producción            |
+| P-14        | Límites de archivos                                   | 5 MB imágenes, 30 MB / 15 s videos (a validar) | Etapa 7               |
+| P-15        | Canales externos de notificación                      | Solo internas + email de auth                  | Etapa 13              |
+| —           | Proveedor de email transaccional y dominio (SPF/DKIM) | Adaptador de consola                           | Producción (ADR 0002) |
+
+## Valores provisorios cargados en la base (etapa 4)
+
+Están en `src/database/seeds/catalogs.data.ts`. Se cambian desde la base (el admin, a partir de la
+etapa 7): el seed nunca pisa lo que ya existe.
+
+| Dato                                 | Valor cargado                                                    | Qué falta                                                  | Bloquea    |
+| ------------------------------------ | ---------------------------------------------------------------- | ---------------------------------------------------------- | ---------- |
+| Localidades y barrios de Córdoba     | 1 provincia, 1 localidad (Córdoba capital), 8 barrios de ejemplo | Fuente oficial con la lista completa                       | Producción |
+| Coordenadas de localidades y barrios | Ninguna (`null`)                                                 | Fuente oficial; las necesita "cerca de mí" (P-11)          | Etapa 7    |
+| Oficios                              | 10 de ejemplo                                                    | Catálogo definitivo del fundador                           | Producción |
+| Precios de los planes                | $10.000 / $15.000 / $20.000 ARS                                  | Confirmar vigencia (FI §6.3)                               | Producción |
+| Imágenes de Basic y Medium           | 5 en total                                                       | ¿Se valida el reparto "2 de presentación + 3 de trabajos"? | Etapa 7    |
+| Métricas en Medium                   | No                                                               | "No confirmado" en FI §6.3                                 | Etapa 13   |
+| Ranking por plan                     | `ranking_tier` 0 / 1 / 2                                         | Pesos del ranking (P-10)                                   | Etapa 7    |
+| Etiqueta "Recomendado" de Premium    | Sin modelar                                                      | Cómo se muestra y si es un campo del plan                  | Etapa 7    |

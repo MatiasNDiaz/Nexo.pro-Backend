@@ -12,8 +12,10 @@ API REST NestJS 12 + TypeORM 1.x + PostgreSQL, Node 26. Lo consume un frontend N
 ## Comandos
 
 - `npm run start:dev` · `npm run build` · `npm run lint` · `npm run format:check` · `npm run typecheck`
-- `npm test` (unitarios, `src/**/*.spec.ts`) · `npm run test:e2e` (`test/*.e2e-spec.ts`)
-- `docker compose up -d` (requiere `.env` con `POSTGRES_PASSWORD`)
+- `npm test` (unitarios, `src/**/*.spec.ts`) · `npm run test:int` (`test/integration/*.int-spec.ts`, con PostgreSQL) · `npm run test:e2e` (`test/*.e2e-spec.ts`, con PostgreSQL)
+- `npm run migration:run` · `migration:revert` · `migration:show` · `npm run seed:catalogs`
+- `docker compose up -d postgres` (requiere `.env` con `POSTGRES_PASSWORD` y `POSTGRES_APP_PASSWORD`)
+- Nueva migración: SQL escrito a mano con los nombres de `SnakeNamingStrategy` (`pk_`, `fk_`, `uq_`, `ix_`, `ck_`), registrada en `src/database/migrations/index.ts`, entidad acorde (lo verifica `test:int`).
 
 ## Reglas permanentes
 
