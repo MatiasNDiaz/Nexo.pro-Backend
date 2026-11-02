@@ -1,5 +1,5 @@
 # Entorno local de desarrollo. NO se usa en producción (Railway gestiona API y base).
-# Requiere un archivo .env (no versionado) con POSTGRES_PASSWORD; ver .env.example.
+# Requiere un archivo .env (no versionado) con POSTGRES_PASSWORD y POSTGRES_APP_PASSWORD; ver .env.example.
 name: nexo-pro
 
 services:
@@ -9,11 +9,13 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-nexo}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Definí POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
       POSTGRES_DB: ${POSTGRES_DB:-nexo_dev}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Definí POSTGRES_APP_PASSWORD en el archivo .env (ver .env.example)}
     ports:
       # Solo en la interfaz local. 5433 por defecto para no chocar con un PostgreSQL instalado.
       - '127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 5s
@@ -26,6 +28,8 @@ services:
       - .env.development
     environment:
       NODE_ENV: development
+      DATABASE_URL: postgres://nexo_app:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-nexo_dev}
+      DATABASE_MIGRATIONS_URL: postgres://${POSTGRES_USER:-nexo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nexo_dev}
     ports:
       - '127.0.0.1:3001:3001'
     depends_on:

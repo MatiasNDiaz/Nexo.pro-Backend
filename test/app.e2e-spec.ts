@@ -24,6 +24,11 @@ describe('Bootstrap HTTP (e2e)', () => {
       expect(res.body).toEqual({ status: 'ok' });
     });
 
+    it('GET /api/v1/health/ready responde ok con la base disponible', async () => {
+      const res = await request(server).get('/api/v1/health/ready').expect(200);
+      expect(res.body).toEqual({ status: 'ok' });
+    });
+
     it('solo existe bajo el prefijo y la versión', async () => {
       await request(server).get('/health/live').expect(404);
       await request(server).get('/api/health/live').expect(404);

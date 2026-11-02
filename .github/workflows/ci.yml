@@ -12,6 +12,21 @@ jobs:
   quality:
     name: Lint, build y tests
     runs-on: ubuntu-latest
+    services:
+      # Base efímera de la CI. Credenciales sin valor fuera de este job (las mismas de .env.test).
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: nexo
+          POSTGRES_PASSWORD: nexo
+          POSTGRES_DB: nexo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexo -d nexo_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -24,6 +39,14 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
+      - name: Migraciones y seed con la CLI sobre la base vacía
+        env:
+          NODE_ENV: test
+        run: |
+          npx typeorm migration:run -d dist/database/data-source.js
+          node dist/database/seeds/run-catalog-seed.js
+          npx typeorm migration:show -d dist/database/data-source.js
+      - run: npm run test:int
       - run: npm run test:e2e
       # Solo dependencias de producción: las de desarrollo no llegan a la imagen (ver docs/testing.md).
       - run: npm audit --omit=dev --audit-level=high
