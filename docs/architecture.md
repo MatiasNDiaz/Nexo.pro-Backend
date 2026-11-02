@@ -11,7 +11,8 @@ Monolito modular NestJS (plan §5–7). Controllers delgados, reglas de negocio 
 | 5. Usuarios y autenticación | Hecha: registro en dos pasos con barrios creados por usuarios, login con cookies, refresh rotativo, CSRF, MFA del admin, reset por admin, guards globales (ver `docs/auth.md` y `docs/authorization.md`) |
 | 6. Autorización y estados   | Hecha: suspensión, baneo, restauración, cambio de rol, revocación de sesiones y baja con anonimización (admin y propia); test que recorre todas las rutas                                                |
 | 7.1 Archivos e identidad    | Hecha: archivos (Cloudinary/local) y foto de perfil, verificación de identidad (módulo de referencia), moderación de barrios, tareas programadas                                                         |
-| 7.2–13                      | Pendientes (ver `docs/roadmap.md`, incluye la etapa 7B de login con Google)                                                                                                                              |
+| 7.2 Perfiles y planes       | Hecha: perfil de cliente y profesional, medios, certificados, redes, horarios, personalización, prueba de 30 días con recordatorios, cambio de foto en revisión                                          |
+| 7.3–13                      | Pendientes (ver `docs/roadmap.md`, incluye la etapa 7B de login con Google)                                                                                                                              |
 
 ## Estructura actual
 
@@ -43,7 +44,7 @@ src/
 ├── common/crypto/          # tokens aleatorios, SHA-256, HMAC, AES-256-GCM
 ├── auth/                   # registro, login, MFA, sesiones, CSRF, cookies, reset, CLI admin:create
 ├── users/                  # entidad, ciclo de vida de la cuenta, purga diaria (cron)
-├── professionals/entities/ # perfil mínimo, profesiones y zonas de trabajo
+├── professionals/          # perfil, medios, certificados, redes, horarios, tema; moderación de contenido
 ├── integrations/mail/      # MailProvider + adaptadores consola/memoria
 ├── integrations/storage/   # StorageProvider + Cloudinary / disco local, detección de tipo real
 ├── integrations/identity/  # IdentityVerificationProvider + manual / simulado (fake)
@@ -52,7 +53,7 @@ src/
 ├── audit/                  # AuditService (puerto AUDIT_LOGGER), global
 ├── locations/              # provincias, localidades, barrios (autocompletado y moderación del admin)
 ├── professions/            # catálogo público de oficios
-├── subscriptions/entities/ # planes
+├── subscriptions/          # planes, prueba de 30 días, recordatorios y vencimiento (tarea diaria)
 └── health/                 # GET /api/v1/health/live y /ready
 test/
 ├── setup/                  # reset de la base de test (globalSetup)
@@ -140,3 +141,17 @@ Detalle de cada guard en `docs/authorization.md`. El de suscripción/plan llega 
 - **`rawBody: true`** en la app: el webhook valida la firma sobre los bytes exactos.
 - **Tareas programadas** con `@nestjs/schedule` (apagadas en tests) y un lock de PostgreSQL
   (`pg_try_advisory_lock`) para que dos instancias, o el comando manual, no corran a la vez.
+
+**Etapa 7.2**
+
+- **Límites desde el plan vigente:** `SubscriptionsService.livePlan` es la única fuente (prueba = Basic,
+  ADR 0017). Sin plan vigente se puede editar el texto del perfil, pero no sumar contenido.
+- **Cada cambio de contenido bloquea el perfil** (`FOR UPDATE`): dos pestañas no pueden superar un límite.
+- **Estado de atención calculado al leerlo** (manual, vencimiento, horario y excepciones en hora de
+  Córdoba): no hace falta una tarea que lo actualice cada pocos minutos.
+- **Personalización con listas cerradas** validadas contra el `theme_level` del plan: nunca CSS ni
+  HTML del usuario.
+- **Cambio de foto con identidad aprobada** (ADR 0019) dentro de `IdentityVerificationService`: la
+  revisión es un intento `AVATAR_CHANGE` y "identidad aprobada" incluye ese caso (`isIdentityApproved`).
+- **Módulos sin ciclos:** `subscriptions` no importa a nadie del dominio; `uploads` usa
+  `subscriptions`; `professionals` usa `uploads` y `subscriptions`.

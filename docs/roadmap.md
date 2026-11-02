@@ -13,7 +13,7 @@ Detalle de alcance, bloqueos y criterios de aceptación: plan §16. Una rama por
 | 5      | Usuarios y autenticación con cookies                                                                                                       | ✅ Aprobada                                  |
 | 6      | Autorización y estados de cuenta: suspensión, baneo, cambio de rol, baja, revocación                                                       | ✅ Aprobada                                  |
 | 7.1    | Archivos (Cloudinary + local), foto de perfil, verificación de identidad (módulo de referencia), moderación de barrios, tareas programadas | ✅ Aprobada                                  |
-| 7.2    | Perfiles de cliente y profesional, medios, certificados, personalización, disponibilidad, planes y prueba de 30 días                       | Pendiente                                    |
+| 7.2    | Perfiles de cliente y profesional, medios, certificados, personalización, disponibilidad, planes y prueba de 30 días                       | 🔄 En revisión                               |
 | 7.3    | Catálogo público y filtros                                                                                                                 | Pendiente                                    |
 | **7B** | **Login con Google** para clientes y profesionales (ADR 0015)                                                                              | Pendiente — agendada por el fundador         |
 | 8      | Chat, solicitudes y contrataciones; notificaciones internas y tiempo real                                                                  | Pendiente (requiere aprobar WebSocket, C-14) |

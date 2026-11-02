@@ -19,7 +19,7 @@ agrega su parte y la documenta acá.
 Un test de integración compara las entidades con el esquema real que dejan las migraciones; si alguien
 cambia una entidad sin migración (o al revés), falla.
 
-## Diagrama (etapas 4 a 7.1)
+## Diagrama (etapas 4 a 7.2)
 
 ```mermaid
 erDiagram
@@ -42,6 +42,17 @@ erDiagram
   stored_files |o--o| users : "avatar_file_id"
   users ||--o{ identity_verifications : "intenta"
   identity_verifications |o--o{ identity_provider_events : "avisos del proveedor"
+  users ||--o| customer_profiles : "cliente"
+  professional_profiles ||--o{ professional_media : "publica"
+  professional_profiles ||--o{ professional_certifications : "presenta"
+  professional_profiles ||--o{ professional_social_links : ""
+  professional_profiles ||--o{ availability_slots : "horario semanal"
+  professional_profiles ||--o{ availability_exceptions : "días sin atención"
+  stored_files ||--o| professional_media : ""
+  stored_files ||--o| professional_certifications : ""
+  users ||--o{ subscriptions : "profesional"
+  subscription_plans ||--o{ subscriptions : ""
+  subscriptions ||--o{ subscription_history : ""
 
   users {
     uuid id PK
@@ -138,23 +149,31 @@ Las tablas de la etapa 4 (`provinces`, `localities`, `professions`, `subscriptio
 
 ## Tablas
 
-| Tabla                        | Para qué                                                                                                               | Integridad en la base                                                                                                           |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `provinces`, `localities`    | Ubicaciones que habilita el admin                                                                                      | Únicos por nombre sin mayúsculas; FK `RESTRICT`; coordenadas ambas o ninguna, en rango                                          |
-| `neighborhoods`              | Barrios creados por los usuarios (ADR 0010)                                                                            | Nombre normalizado único por localidad (incluye alias fusionados); `merged_into_id` si y solo si `MERGED`; no apunta a sí mismo |
-| `professions`                | Catálogo único de oficios (lo administra el admin)                                                                     | `slug` único con formato `minúsculas-con-guiones`; nombre único sin mayúsculas                                                  |
-| `subscription_plans`         | **Única fuente** de precios y límites de plan                                                                          | `code` único; precio ≥ 0; moneda de 3 letras mayúsculas; límites no negativos y al menos 1 profesión                            |
-| `users`                      | Identidad y credenciales                                                                                               | Email único entre no borrados (`citext`); intentos fallidos ≥ 0; un cliente tiene barrio                                        |
-| `auth_sessions`              | Una fila por refresh token; la familia es el dispositivo                                                               | Hash único; `replaced_by_id` encadena las rotaciones                                                                            |
-| `one_time_tokens`            | Enlaces de un solo uso                                                                                                 | Hash único; el consumo es un `UPDATE … WHERE used_at IS NULL AND expires_at > now()` atómico                                    |
-| `user_mfa_settings`          | TOTP del admin                                                                                                         | Uno por usuario                                                                                                                 |
-| `professional_profiles`      | Perfil profesional (mínimo hasta la etapa 7). `deactivated_at` si el usuario cambió de rol o se dio de baja (ADR 0012) | Uno por usuario                                                                                                                 |
-| `professional_professions`   | Oficios del profesional                                                                                                | Una sola principal por profesional (índice parcial)                                                                             |
-| `professional_service_areas` | Zonas de trabajo (1 a 20)                                                                                              | El barrio pertenece a la localidad (FK compuesta); sin zonas repetidas (`NULLS NOT DISTINCT`)                                   |
-| `stored_files`               | Metadatos de archivos (ADR 0018); el binario está en Cloudinary (o en disco en desarrollo)                             | `storage_key` único; READY exige tipo y peso; duración ≤ 15,5 s; índice parcial de pendientes para la limpieza                  |
-| `identity_verifications`     | Intentos de verificación de identidad (ADR 0003). Sin imágenes ni datos biométricos                                    | Un solo intento abierto por usuario (índice único parcial); `(user_id, attempt_number)` único; referencia del proveedor única   |
-| `identity_provider_events`   | Webhooks recibidos del proveedor                                                                                       | `(provider, event_id)` único: idempotencia                                                                                      |
-| `admin_audit_logs`           | Acciones administrativas y eventos de seguridad                                                                        | **Append-only**: un trigger rechaza `UPDATE`, `DELETE` y `TRUNCATE`; el rol de runtime solo tiene `SELECT` e `INSERT`           |
+| Tabla                         | Para qué                                                                                                               | Integridad en la base                                                                                                           |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `provinces`, `localities`     | Ubicaciones que habilita el admin                                                                                      | Únicos por nombre sin mayúsculas; FK `RESTRICT`; coordenadas ambas o ninguna, en rango                                          |
+| `neighborhoods`               | Barrios creados por los usuarios (ADR 0010)                                                                            | Nombre normalizado único por localidad (incluye alias fusionados); `merged_into_id` si y solo si `MERGED`; no apunta a sí mismo |
+| `professions`                 | Catálogo único de oficios (lo administra el admin)                                                                     | `slug` único con formato `minúsculas-con-guiones`; nombre único sin mayúsculas                                                  |
+| `subscription_plans`          | **Única fuente** de precios y límites de plan                                                                          | `code` único; precio ≥ 0; moneda de 3 letras mayúsculas; límites no negativos y al menos 1 profesión                            |
+| `users`                       | Identidad y credenciales                                                                                               | Email único entre no borrados (`citext`); intentos fallidos ≥ 0; un cliente tiene barrio                                        |
+| `auth_sessions`               | Una fila por refresh token; la familia es el dispositivo                                                               | Hash único; `replaced_by_id` encadena las rotaciones                                                                            |
+| `one_time_tokens`             | Enlaces de un solo uso                                                                                                 | Hash único; el consumo es un `UPDATE … WHERE used_at IS NULL AND expires_at > now()` atómico                                    |
+| `user_mfa_settings`           | TOTP del admin                                                                                                         | Uno por usuario                                                                                                                 |
+| `professional_profiles`       | Perfil profesional (mínimo hasta la etapa 7). `deactivated_at` si el usuario cambió de rol o se dio de baja (ADR 0012) | Uno por usuario                                                                                                                 |
+| `professional_professions`    | Oficios del profesional                                                                                                | Una sola principal por profesional (índice parcial)                                                                             |
+| `professional_service_areas`  | Zonas de trabajo (1 a 20)                                                                                              | El barrio pertenece a la localidad (FK compuesta); sin zonas repetidas (`NULLS NOT DISTINCT`)                                   |
+| `stored_files`                | Metadatos de archivos (ADR 0018); el binario está en Cloudinary (o en disco en desarrollo)                             | `storage_key` único; READY exige tipo y peso; duración ≤ 15,5 s; índice parcial de pendientes para la limpieza                  |
+| `identity_verifications`      | Intentos de verificación de identidad (ADR 0003). Sin imágenes ni datos biométricos                                    | Un solo intento abierto por usuario (índice único parcial); `(user_id, attempt_number)` único; referencia del proveedor única   |
+| `identity_provider_events`    | Webhooks recibidos del proveedor                                                                                       | `(provider, event_id)` único: idempotencia                                                                                      |
+| `customer_profiles`           | Datos del cliente que no son de identidad (`extra_info`, 300)                                                          | Uno por usuario                                                                                                                 |
+| `professional_media`          | Imágenes, videos y banner del perfil (FI §6.3)                                                                         | Archivo único; posición ≥ 0; oculto por el admin exige fecha y motivo. Cantidades según el plan (en el servicio)                |
+| `professional_certifications` | Certificados (ADR 0020): públicos al subirlos, "cargados por el profesional"                                           | Archivo único; `sensitive_data_confirmed_at` obligatorio; año entre 1950 y 2100; máximo 10 (en el servicio)                     |
+| `professional_social_links`   | Redes del profesional                                                                                                  | Una por red; solo `https://` (el dominio de cada red se valida en el servicio)                                                  |
+| `availability_slots`          | Horario semanal (hora de Córdoba)                                                                                      | Día 1 a 7; inicio antes del fin. Sin superposiciones (en el servicio)                                                           |
+| `availability_exceptions`     | Días sin atención (descanso, feriado, vacaciones)                                                                      | Fin ≥ inicio                                                                                                                    |
+| `subscriptions`               | Prueba de 30 días y, desde la etapa 9, planes pagos                                                                    | **Una viva por usuario** (índice único parcial); `TRIAL` exige `trial_ends_at`; recordatorio 7, 3 o 1                           |
+| `subscription_history`        | Historial de la suscripción (`TRIAL_STARTED`, `TRIAL_EXPIRED`; pagos en la etapa 9)                                    | Solo inserciones                                                                                                                |
+| `admin_audit_logs`            | Acciones administrativas y eventos de seguridad                                                                        | **Append-only**: un trigger rechaza `UPDATE`, `DELETE` y `TRUNCATE`; el rol de runtime solo tiene `SELECT` e `INSERT`           |
 
 Eventos auditados hoy: `USER_REGISTERED`, `ACCOUNT_LOCKED`, `REFRESH_TOKEN_REUSE`, `ADMIN_LOGIN`,
 `ADMIN_LOGIN_RECOVERY_CODE`, `ADMIN_PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET_COMPLETED`,
@@ -165,7 +184,13 @@ Eventos auditados hoy: `USER_REGISTERED`, `ACCOUNT_LOCKED`, `REFRESH_TOKEN_REUSE
 resultado `DENIED`), `NEIGHBORHOOD_APPROVED`, `NEIGHBORHOOD_RENAMED` y `NEIGHBORHOOD_MERGED` (con
 cuántos clientes y zonas se movieron).
 
-`users.avatar_file_id`: foto de perfil (paso 2 del registro, ADR 0006). Al anonimizar una cuenta, sus
+`users.avatar_file_id`: foto de perfil (paso 2 del registro, ADR 0006). `users.pending_avatar_file_id`: foto nueva en revisión con la identidad aprobada; `identity_verifications.kind = AVATAR_CHANGE` es esa revisión (ADR 0019).
+
+`professional_profiles` (etapa 7.2): `slug` único para la URL pública, descripción de hasta 200, tarifa de referencia con su modalidad (las dos o ninguna), estado de atención manual con vencimiento y opción automática por horario (el estado que se muestra se calcula al leerlo) y `theme` con valores de listas cerradas. `subscription_plans` suma `max_image_bytes` y `max_video_bytes` (ADR 0018).
+
+Eventos auditados nuevos: `PROFESSIONAL_MEDIA_HIDDEN` / `_RESTORED` y `PROFESSIONAL_CERTIFICATION_HIDDEN` / `_RESTORED`.
+
+Al anonimizar una cuenta, sus
 archivos pasan a `DELETED` y se borran del proveedor.
 
 `users.deletion_scheduled_for`: fecha en que se anonimiza una cuenta dada de baja (30 días de gracia, ADR 0016).
