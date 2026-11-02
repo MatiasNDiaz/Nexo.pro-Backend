@@ -28,6 +28,8 @@ import { IdentityVerificationModule } from './identity-verification/identity-ver
 import { MailModule } from './integrations/mail/mail.module';
 import { LocationsModule } from './locations/locations.module';
 import { ProfessionsModule } from './professions/professions.module';
+import { ProfessionalsModule } from './professionals/professionals.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { UsersModule } from './users/users.module';
 
@@ -83,6 +85,8 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
     UsersModule,
     UploadsModule,
     IdentityVerificationModule,
+    SubscriptionsModule,
+    ProfessionalsModule,
   ],
   providers: [
     // Guards globales, en este orden (plan §9.8). Denegación por defecto: solo `@Public()` pasa

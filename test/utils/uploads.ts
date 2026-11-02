@@ -7,6 +7,29 @@ export const PNG_BYTES = Buffer.from(
   'base64',
 );
 
+/** PDF mínimo válido (cabecera `%PDF`). */
+export const PDF_BYTES = Buffer.from(
+  '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0/Kids[]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n',
+  'latin1',
+);
+
+function box(type: string, ...content: Buffer[]): Buffer {
+  const body = Buffer.concat(content);
+  const header = Buffer.alloc(8);
+  header.writeUInt32BE(body.length + 8, 0);
+  header.write(type, 4, 'latin1');
+  return Buffer.concat([header, body]);
+}
+
+/** MP4 mínimo (ftyp + moov/mvhd) con la duración pedida. */
+export function fakeMp4(durationMs: number): Buffer {
+  const mvhd = Buffer.alloc(100);
+  mvhd.writeUInt32BE(1000, 12);
+  mvhd.writeUInt32BE(durationMs, 16);
+  const ftyp = box('ftyp', Buffer.from('isom\0\0\x02\0isomiso2mp41', 'latin1'));
+  return Buffer.concat([ftyp, box('moov', box('mvhd', mvhd))]);
+}
+
 export interface UploadTicketBody {
   file: { id: string; status: string; url: string | null };
   upload: { method: string; url: string; fields: Record<string, string>; maxBytes: number };
@@ -34,6 +57,20 @@ export async function uploadRaw(
       contentType: options.contentType ?? 'image/png',
     });
   return { ticket, put, fileId: ticket.file.id };
+}
+
+/** Sube y confirma un archivo; devuelve su id. */
+export async function uploadFile(
+  client: Client,
+  content: Buffer,
+  options: { purpose: string; kind: string; filename?: string; contentType?: string },
+) {
+  const { fileId } = await uploadRaw(client, content, options);
+  const completed = await client.post(`/uploads/${fileId}/complete`);
+  if (completed.status !== 200) {
+    throw new Error(`Confirmación falló: ${completed.status} ${JSON.stringify(completed.body)}`);
+  }
+  return fileId;
 }
 
 /** Sube, confirma y usa una foto de perfil. Devuelve el archivo confirmado. */

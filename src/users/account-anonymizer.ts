@@ -2,7 +2,15 @@ import { EntityManager } from 'typeorm';
 import { AuthSession, SessionRevokeReason } from '../auth/entities/auth-session.entity';
 import { OneTimeToken } from '../auth/entities/one-time-token.entity';
 import { UserMfaSettings } from '../auth/entities/user-mfa-settings.entity';
+import {
+  AvailabilityException,
+  AvailabilitySlot,
+} from '../professionals/entities/availability.entity';
+import { ProfessionalCertification } from '../professionals/entities/professional-certification.entity';
+import { ProfessionalMedia } from '../professionals/entities/professional-media.entity';
 import { ProfessionalProfile } from '../professionals/entities/professional-profile.entity';
+import { ProfessionalSocialLink } from '../professionals/entities/professional-social-link.entity';
+import { CustomerProfile } from './entities/customer-profile.entity';
 import { User } from './entities/user.entity';
 import { AccountStatus } from './user.enums';
 
@@ -37,6 +45,7 @@ export async function anonymizeAccount(manager: EntityManager, userId: string): 
     .set({ deactivatedAt: now })
     .where('user_id = :userId AND deactivated_at IS NULL', { userId })
     .execute();
+  await anonymizeProfiles(manager, userId);
   await manager
     .createQueryBuilder()
     .update(AuthSession)
@@ -60,4 +69,30 @@ export async function accountsDueForAnonymization(
     })
     .getRawMany<{ id: string }>();
   return rows.map((row) => row.id);
+}
+
+/**
+ * Perfiles: se borra lo que la persona escribió o subió (descripción, nombre comercial, medios,
+ * certificados, redes, horarios, datos del cliente). Los archivos ya los marcó `detachAllFrom`.
+ * Se conservan las profesiones y zonas (no son datos personales) y el slug pasa a ser anónimo.
+ */
+async function anonymizeProfiles(manager: EntityManager, userId: string): Promise<void> {
+  await manager.getRepository(CustomerProfile).delete({ userId });
+  const profile = await manager.getRepository(ProfessionalProfile).findOneBy({ userId });
+  if (!profile) return;
+  const professionalId = profile.id;
+  await manager.getRepository(ProfessionalMedia).delete({ professionalId });
+  await manager.getRepository(ProfessionalCertification).delete({ professionalId });
+  await manager.getRepository(ProfessionalSocialLink).delete({ professionalId });
+  await manager.getRepository(AvailabilitySlot).delete({ professionalId });
+  await manager.getRepository(AvailabilityException).delete({ professionalId });
+  await manager.getRepository(ProfessionalProfile).update(professionalId, {
+    slug: `eliminado-${professionalId.replace(/-/g, '').slice(0, 16)}`,
+    businessName: null,
+    bio: null,
+    yearsExperience: null,
+    referenceRate: null,
+    rateMode: null,
+    theme: {},
+  });
 }

@@ -22,7 +22,8 @@ import { UploadsService } from '../uploads/uploads.service';
 import { accountsDueForAnonymization, anonymizeAccount } from './account-anonymizer';
 import { ChangeRoleDto } from './dto/account-admin.dto';
 import { User } from './entities/user.entity';
-import { AccountStatus, UserRole, VerificationStatus } from './user.enums';
+import { isIdentityApproved } from './identity-status';
+import { AccountStatus, UserRole } from './user.enums';
 
 /** Una cuenta que no se puede llevar a ese estado desde el actual. */
 const invalidTransition = (from: AccountStatus, action: string) =>
@@ -83,10 +84,9 @@ export class AccountsService {
         user.status === AccountStatus.SUSPENDED || user.status === AccountStatus.BANNED;
       if (!pendingDeletion && !sanctioned) throw invalidTransition(user.status, 'restaurar');
 
-      const status =
-        user.verificationStatus === VerificationStatus.APPROVED
-          ? AccountStatus.ACTIVE
-          : AccountStatus.PENDING_VERIFICATION;
+      const status = isIdentityApproved(user)
+        ? AccountStatus.ACTIVE
+        : AccountStatus.PENDING_VERIFICATION;
       await manager
         .getRepository(User)
         .update(user.id, { status, statusReason: null, deletionScheduledFor: null });
@@ -279,6 +279,7 @@ export class AccountsService {
   private async becomeProfessional(manager: EntityManager, user: User, dto: ChangeRoleDto) {
     const previous = await this.professionals.reactivate(manager, user.id);
     if (previous) {
+      await this.professionals.grantTrialIfFirst(manager, user.id);
       return dto.serviceAreas
         ? this.professionals.replaceServiceAreas(manager, previous.id, dto.serviceAreas)
         : [];

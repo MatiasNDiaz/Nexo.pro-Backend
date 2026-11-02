@@ -16,15 +16,18 @@ export interface CloudinaryCredentials {
   folder: string;
 }
 
+/** Cloudinary trata los PDF como recurso de tipo imagen. */
 const RESOURCE_TYPE: Record<FileKind, 'image' | 'video'> = {
   [FileKind.IMAGE]: 'image',
   [FileKind.VIDEO]: 'video',
+  [FileKind.DOCUMENT]: 'image',
 };
 
 /** Formatos que Cloudinary acepta en la subida (firmados: el navegador no los puede cambiar). */
 const ALLOWED_FORMATS: Record<FileKind, string> = {
   [FileKind.IMAGE]: 'jpg,png,webp',
   [FileKind.VIDEO]: 'mp4,mov',
+  [FileKind.DOCUMENT]: 'pdf',
 };
 
 /** Formato decodificado por Cloudinary → tipo MIME. Otro formato = no admitido. */
@@ -35,6 +38,7 @@ const MIME_BY_FORMAT: Record<string, string> = {
   webp: 'image/webp',
   mp4: 'video/mp4',
   mov: 'video/quicktime',
+  pdf: 'application/pdf',
 };
 
 interface CloudinaryResource {

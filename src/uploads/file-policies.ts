@@ -1,3 +1,4 @@
+import { UserRole } from '../users/user.enums';
 import { FileKind, FilePurpose, FileVisibility } from './file.enums';
 
 const MB = 1024 * 1024;
@@ -6,6 +7,7 @@ const MB = 1024 * 1024;
 export const ALLOWED_MIME_TYPES: Record<FileKind, readonly string[]> = {
   [FileKind.IMAGE]: ['image/jpeg', 'image/png', 'image/webp'],
   [FileKind.VIDEO]: ['video/mp4', 'video/quicktime'],
+  [FileKind.DOCUMENT]: ['application/pdf'],
 };
 
 /**
@@ -20,28 +22,57 @@ export const MAX_PENDING_UPLOADS_PER_USER = 10;
 /** Subidas sin confirmar después de este tiempo se descartan (job horario). */
 export const PENDING_UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Tope del cuerpo en la subida al adaptador local: el mayor peso de cualquier plan (video Premium).
+ * El límite real del usuario se valida después, igual que con Cloudinary.
+ */
+export const LOCAL_UPLOAD_MAX_BYTES = 50 * MB;
+
+/** Pesos por plan (columnas de `subscription_plans`, ADR 0018). */
+export interface PlanFileLimits {
+  maxImageBytes: number;
+  maxVideoBytes: number;
+}
+
 export interface FilePolicy {
   kinds: readonly FileKind[];
+  roles: readonly UserRole[];
   visibility: FileVisibility;
   /** Carpeta dentro del proveedor. */
   folder: string;
-  maxBytes: Record<FileKind, number>;
+  /** Si es true, hace falta un plan vigente (los pesos salen del plan). */
+  needsPlan: boolean;
+  maxBytes(kind: FileKind, plan: PlanFileLimits | null): number;
 }
 
 /**
- * Reglas por propósito. Pesos aprobados por el fundador (ADR 0018): foto de perfil y certificados
- * 5 MB; los medios del perfil dependen del plan y llegan en la etapa 7.2.
+ * Reglas por propósito (ADR 0018 y 0020): foto de perfil y certificados hasta 5 MB; los medios del
+ * perfil según el plan (imágenes 5 MB, Premium 10 MB; videos 30 MB, Premium 50 MB).
  */
 export const FILE_POLICIES: Record<FilePurpose, FilePolicy> = {
   [FilePurpose.AVATAR]: {
     kinds: [FileKind.IMAGE],
+    roles: [UserRole.CUSTOMER, UserRole.PROFESSIONAL],
     visibility: FileVisibility.PUBLIC,
     folder: 'avatars',
-    maxBytes: { [FileKind.IMAGE]: 5 * MB, [FileKind.VIDEO]: 0 },
+    needsPlan: false,
+    maxBytes: () => 5 * MB,
+  },
+  [FilePurpose.PROFILE_MEDIA]: {
+    kinds: [FileKind.IMAGE, FileKind.VIDEO],
+    roles: [UserRole.PROFESSIONAL],
+    visibility: FileVisibility.PUBLIC,
+    folder: 'media',
+    needsPlan: true,
+    maxBytes: (kind, plan) =>
+      !plan ? 0 : kind === FileKind.VIDEO ? plan.maxVideoBytes : plan.maxImageBytes,
+  },
+  [FilePurpose.CERTIFICATE]: {
+    kinds: [FileKind.IMAGE, FileKind.DOCUMENT],
+    roles: [UserRole.PROFESSIONAL],
+    visibility: FileVisibility.PUBLIC,
+    folder: 'certificates',
+    needsPlan: true,
+    maxBytes: () => 5 * MB,
   },
 };
-
-/** El mayor peso de cualquier política: tope del cuerpo en la subida local. */
-export const MAX_UPLOAD_BYTES = Math.max(
-  ...Object.values(FILE_POLICIES).flatMap((policy) => policy.kinds.map((k) => policy.maxBytes[k])),
-);

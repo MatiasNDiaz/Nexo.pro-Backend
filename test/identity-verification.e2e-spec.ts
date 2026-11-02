@@ -4,15 +4,20 @@ import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { AdminAuditLog, AuditResult } from '../src/audit/entities/admin-audit-log.entity';
 import { IdentityProviderEvent } from '../src/identity-verification/entities/identity-provider-event.entity';
-import { IdentityVerification } from '../src/identity-verification/entities/identity-verification.entity';
+import {
+  IdentityVerification,
+  VerificationKind,
+} from '../src/identity-verification/entities/identity-verification.entity';
 import { IdentityVerificationService } from '../src/identity-verification/identity-verification.service';
 import type { FakeIdentityProvider } from '../src/integrations/identity/fake-identity.provider';
 import { IDENTITY_PROVIDER } from '../src/integrations/identity/identity-verification.provider';
 import { User } from '../src/users/entities/user.entity';
-import { AccountStatus } from '../src/users/user.enums';
+import { StoredFile } from '../src/uploads/entities/stored-file.entity';
+import { FileStatus } from '../src/uploads/file.enums';
+import { AccountStatus, VerificationStatus } from '../src/users/user.enums';
 import { type Client, signInAdmin, signInCustomer } from './utils/auth-client';
 import { createTestApp } from './utils/create-test-app';
-import { customerReadyForVerification } from './utils/uploads';
+import { customerReadyForVerification, PNG_BYTES, uploadFile } from './utils/uploads';
 
 describe('Verificación de identidad (e2e, proveedor simulado)', () => {
   let app: NestExpressApplication;
@@ -258,5 +263,129 @@ describe('Verificación de identidad (e2e, proveedor simulado)', () => {
     expect(
       (await decide(randomUUID(), { decision: 'APPROVE', reason: 'Identidad ok' })).status,
     ).toBe(404);
+  });
+
+  describe('cambio de foto con la identidad aprobada (ADR 0019)', () => {
+    async function approvedCustomer() {
+      const ready = await started();
+      await decide(ready.verificationId, { decision: 'APPROVE', reason: 'Identidad confirmada' });
+      return ready;
+    }
+
+    const fileStatus = async (id: string) =>
+      (await dataSource.getRepository(StoredFile).findOneByOrFail({ id })).status;
+
+    /** Sube una foto nueva y la propone; devuelve la respuesta del cambio. */
+    async function changePhoto(client: Client) {
+      const fileId = await uploadFile(client, PNG_BYTES, { purpose: 'AVATAR', kind: 'IMAGE' });
+      const res = await client.put('/users/me/avatar', { fileId });
+      expect(res.status).toBe(200);
+      return res.body as { id: string; url: string; underReview: boolean };
+    }
+
+    const openReview = (userId: string) =>
+      dataSource.getRepository(IdentityVerification).findOneByOrFail({
+        userId,
+        kind: VerificationKind.AVATAR_CHANGE,
+        status: VerificationStatus.REQUIRES_REVIEW,
+      });
+
+    it('la foto nueva queda en revisión, la cuenta sigue activa y se ve la anterior', async () => {
+      const { client, id, avatar } = await approvedCustomer();
+      const proposed = await changePhoto(client);
+      expect(proposed.underReview).toBe(true);
+
+      const me = (await client.get('/auth/me')).body;
+      expect(me).toMatchObject({
+        status: 'ACTIVE',
+        verificationStatus: 'REQUIRES_REVIEW',
+        avatarUrl: avatar.url,
+        pendingAvatarUrl: proposed.url,
+      });
+      const start = await client.post('/identity-verification');
+      expect(start.body.code).toBe('ALREADY_VERIFIED');
+
+      // Otra foto mientras tanto reemplaza a la pendiente, en la misma revisión.
+      const again = await changePhoto(client);
+      expect(await fileStatus(proposed.id)).toBe(FileStatus.DELETED);
+      expect(
+        await dataSource
+          .getRepository(IdentityVerification)
+          .countBy({ userId: id, kind: VerificationKind.AVATAR_CHANGE }),
+      ).toBe(1);
+
+      const list = await admin.get('/admin/identity-verifications?status=REQUIRES_REVIEW&limit=50');
+      const review = await openReview(id);
+      expect(
+        (list.body.data as Array<{ id: string }>).find((v) => v.id === review.id),
+      ).toMatchObject({
+        kind: 'AVATAR_CHANGE',
+        subject: { avatarUrl: avatar.url, pendingAvatarUrl: again.url },
+      });
+    });
+
+    it('si el admin la aprueba, reemplaza a la anterior', async () => {
+      const { client, id, avatar } = await approvedCustomer();
+      const proposed = await changePhoto(client);
+      const review = await openReview(id);
+
+      const res = await decide(review.id, { decision: 'APPROVE', reason: 'Es la misma persona' });
+      expect(res.status).toBe(200);
+      expect((await client.get('/auth/me')).body).toMatchObject({
+        status: 'ACTIVE',
+        verificationStatus: 'APPROVED',
+        avatarUrl: proposed.url,
+        pendingAvatarUrl: null,
+      });
+      expect(await fileStatus(avatar.id)).toBe(FileStatus.DELETED);
+    });
+
+    it('si el admin la rechaza, queda la anterior y la identidad sigue aprobada', async () => {
+      const { client, id, avatar } = await approvedCustomer();
+      const proposed = await changePhoto(client);
+      const review = await openReview(id);
+
+      const res = await decide(review.id, { decision: 'REJECT', reason: 'No es la misma persona' });
+      expect(res.status).toBe(200);
+      expect((await client.get('/auth/me')).body).toMatchObject({
+        status: 'ACTIVE',
+        verificationStatus: 'APPROVED',
+        avatarUrl: avatar.url,
+        pendingAvatarUrl: null,
+      });
+      expect(await fileStatus(proposed.id)).toBe(FileStatus.DELETED);
+    });
+
+    it('revocar la identidad descarta la foto pendiente y cierra la revisión', async () => {
+      const { client, id, verificationId } = await approvedCustomer();
+      const proposed = await changePhoto(client);
+      const res = await decide(verificationId, {
+        decision: 'REVOKE',
+        reason: 'Documento adulterado',
+      });
+      expect(res.status).toBe(200);
+      const user = await dataSource.getRepository(User).findOneByOrFail({ id });
+      expect(user).toMatchObject({
+        status: AccountStatus.PENDING_VERIFICATION,
+        verificationStatus: VerificationStatus.REVOKED,
+        pendingAvatarFileId: null,
+      });
+      expect(await fileStatus(proposed.id)).toBe(FileStatus.DELETED);
+      expect(
+        await dataSource.getRepository(IdentityVerification).countBy({
+          userId: id,
+          kind: VerificationKind.AVATAR_CHANGE,
+          status: VerificationStatus.REQUIRES_REVIEW,
+        }),
+      ).toBe(0);
+    });
+
+    it('antes de la primera aprobación la foto se cambia directamente', async () => {
+      const { client, avatar } = await customerReadyForVerification(app);
+      const proposed = await changePhoto(client);
+      expect(proposed.underReview).toBe(false);
+      expect((await client.get('/auth/me')).body.avatarUrl).toBe(proposed.url);
+      expect(await fileStatus(avatar.id)).toBe(FileStatus.DELETED);
+    });
   });
 });

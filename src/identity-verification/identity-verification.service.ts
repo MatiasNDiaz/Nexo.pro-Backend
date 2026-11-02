@@ -20,13 +20,17 @@ import {
   type IdentityVerificationProvider,
   type WebhookRequest,
 } from '../integrations/identity/identity-verification.provider';
+import { StoredFile } from '../uploads/entities/stored-file.entity';
+import { FilePurpose } from '../uploads/file.enums';
 import { UploadsService } from '../uploads/uploads.service';
+import { isIdentityApproved } from '../users/identity-status';
 import { User } from '../users/entities/user.entity';
 import { UserRole, VerificationStatus } from '../users/user.enums';
 import {
   type AdminDecision,
   type AdminDecisionDto,
   type AdminVerificationListDto,
+  type AvatarResponseDto,
   AdminVerificationResponseDto,
   type ListVerificationsQueryDto,
   type StartVerificationResponseDto,
@@ -34,7 +38,11 @@ import {
   type VerificationSubjectDto,
 } from './dto/identity-verification.dto';
 import { IdentityProviderEvent } from './entities/identity-provider-event.entity';
-import { DecisionSource, IdentityVerification } from './entities/identity-verification.entity';
+import {
+  DecisionSource,
+  IdentityVerification,
+  VerificationKind,
+} from './entities/identity-verification.entity';
 import { canTransition, OPEN_STATUSES } from './verification-state-machine';
 
 export type WebhookOutcome = 'PROCESSED' | 'DUPLICATE' | 'IGNORED' | 'UNKNOWN_REFERENCE';
@@ -72,22 +80,22 @@ export class IdentityVerificationService {
       throw new ForbiddenException();
     }
 
-    const open = await this.findOpenAttempt(user.id);
-    if (open) return this.toStartResponse(open, true, null, null);
-
-    const latest = await this.findLatest(user.id);
-    if (latest?.status === VerificationStatus.APPROVED) {
+    const subject = await this.dataSource.getRepository(User).findOneByOrFail({ id: user.id });
+    // Aprobada (o aprobada con una foto nueva en revisión, ADR 0019): no hay nada que iniciar.
+    if (isIdentityApproved(subject)) {
       throw new ConflictException({
         code: 'ALREADY_VERIFIED',
         message: 'La identidad ya está verificada.',
       });
     }
-    this.assertProfileComplete(
-      await this.dataSource.getRepository(User).findOneByOrFail({ id: user.id }),
-    );
+    const open = await this.findOpenAttempt(user.id);
+    if (open) return this.toStartResponse(open, true, null, null);
+
+    this.assertProfileComplete(subject);
+    // Las revisiones de foto no cuentan como intentos (ADR 0019).
     const attempts = await this.dataSource
       .getRepository(IdentityVerification)
-      .countBy({ userId: user.id });
+      .countBy({ userId: user.id, kind: VerificationKind.IDENTITY });
     if (attempts >= this.config.maxAttempts) {
       throw new UnprocessableEntityException({
         code: 'VERIFICATION_ATTEMPTS_EXCEEDED',
@@ -110,7 +118,8 @@ export class IdentityVerificationService {
           status: VerificationStatus.PENDING,
           provider: this.provider.name,
           providerReference: session.providerReference,
-          attemptNumber: attempts + 1,
+          attemptNumber: await this.nextAttemptNumber(manager, user.id),
+          kind: VerificationKind.IDENTITY,
           decisionSource: null,
           reasonCode: null,
           adminNote: null,
@@ -217,6 +226,7 @@ export class IdentityVerificationService {
   ): Promise<AdminVerificationResponseDto> {
     if (admin.role !== UserRole.ADMIN) throw new ForbiddenException();
     const target = ADMIN_TARGET[dto.decision];
+    let discarded: StoredFile[] = [];
 
     const updated = await this.dataSource.transaction(async (manager) => {
       const found = await manager
@@ -234,11 +244,11 @@ export class IdentityVerificationService {
           message: `No se puede pasar de ${current.status} a ${target}.`,
         });
       }
-      if (target === VerificationStatus.APPROVED) {
+      const subject = await manager.getRepository(User).findOneByOrFail({ id: current.userId });
+      const avatarReview = current.kind === VerificationKind.AVATAR_CHANGE;
+      if (target === VerificationStatus.APPROVED && !avatarReview) {
         // ADR 0006: solo se aprueba con el perfil completo.
-        this.assertProfileComplete(
-          await manager.getRepository(User).findOneByOrFail({ id: current.userId }),
-        );
+        this.assertProfileComplete(subject);
       }
 
       current.status = target;
@@ -248,7 +258,24 @@ export class IdentityVerificationService {
       current.reasonCode = dto.reasonCode ?? current.reasonCode;
       current.adminNote = dto.adminNote ?? current.adminNote;
       const saved = await manager.getRepository(IdentityVerification).save(current);
-      await this.applyVerificationStatus(manager, current.userId, target);
+
+      if (avatarReview) {
+        // ADR 0019: aprobar reemplaza la foto; rechazar conserva la anterior. La identidad sigue
+        // aprobada en los dos casos.
+        discarded = await this.resolveAvatarReview(
+          manager,
+          subject,
+          target === VerificationStatus.APPROVED,
+        );
+        await this.applyVerificationStatus(manager, current.userId, VerificationStatus.APPROVED);
+      } else {
+        if (target === VerificationStatus.REVOKED && subject.pendingAvatarFileId) {
+          // Revocar la identidad cierra también la revisión de foto abierta.
+          discarded = await this.resolveAvatarReview(manager, subject, false);
+          await this.closeOpenAvatarReview(manager, admin, subject.id);
+        }
+        await this.applyVerificationStatus(manager, current.userId, target);
+      }
       if (target === VerificationStatus.REVOKED) {
         // La cuenta vuelve a PENDING_VERIFICATION: se cierran sus sesiones.
         await this.sessions.revokeAllForUser(
@@ -261,7 +288,71 @@ export class IdentityVerificationService {
       return saved;
     });
 
+    await this.uploads.deleteFromStorage(discarded);
     return AdminVerificationResponseDto.fromAdmin(updated);
+  }
+
+  /**
+   * Cambio de foto de perfil. Antes de la primera aprobación se reemplaza directamente. Con la
+   * identidad aprobada (ADR 0019) la foto nueva queda pendiente, la verificación pasa a revisión
+   * del admin y en público se sigue viendo la anterior.
+   */
+  async changeAvatar(user: AuthUser, fileId: string): Promise<AvatarResponseDto> {
+    let discarded: StoredFile[] = [];
+    const result = await this.dataSource.transaction(async (manager) => {
+      const subject = await manager
+        .getRepository(User)
+        .findOne({ where: { id: user.id }, lock: { mode: 'pessimistic_write' } });
+      if (!subject) throw new NotFoundException();
+      const file = await this.uploads.lockReadyFile(manager, user.id, fileId, FilePurpose.AVATAR);
+      if (subject.avatarFileId === file.id || subject.pendingAvatarFileId === file.id) {
+        return { file, underReview: subject.pendingAvatarFileId === file.id };
+      }
+
+      if (!isIdentityApproved(subject)) {
+        discarded = await this.uploads.markDeleted(
+          manager,
+          subject.avatarFileId ? [subject.avatarFileId] : [],
+        );
+        await manager.getRepository(User).update(subject.id, { avatarFileId: file.id });
+        return { file, underReview: false };
+      }
+
+      discarded = await this.uploads.markDeleted(
+        manager,
+        subject.pendingAvatarFileId ? [subject.pendingAvatarFileId] : [],
+      );
+      await manager.getRepository(User).update(subject.id, { pendingAvatarFileId: file.id });
+      const open = await manager.getRepository(IdentityVerification).findOneBy({
+        userId: subject.id,
+        kind: VerificationKind.AVATAR_CHANGE,
+        status: VerificationStatus.REQUIRES_REVIEW,
+      });
+      if (!open) {
+        const repository = manager.getRepository(IdentityVerification);
+        await repository.insert(
+          repository.create({
+            id: randomUUID(),
+            userId: subject.id,
+            kind: VerificationKind.AVATAR_CHANGE,
+            status: VerificationStatus.REQUIRES_REVIEW,
+            provider: 'MANUAL',
+            providerReference: null,
+            attemptNumber: await this.nextAttemptNumber(manager, subject.id),
+            decisionSource: null,
+            reasonCode: null,
+            adminNote: null,
+            decidedBy: null,
+            submittedAt: new Date(),
+            decidedAt: null,
+          }),
+        );
+        await this.applyVerificationStatus(manager, subject.id, VerificationStatus.REQUIRES_REVIEW);
+      }
+      return { file, underReview: true };
+    });
+    await this.uploads.deleteFromStorage(discarded);
+    return { ...this.uploads.toResponse(result.file), underReview: result.underReview };
   }
 
   /** Cola de revisión del admin: las más viejas primero, con los datos para reconocer a la persona. */
@@ -288,6 +379,48 @@ export class IdentityVerificationService {
 
   // ---------------------------------------------------------------------------------------------
 
+  /** Cierra la revisión de foto: aprobada, la nueva reemplaza a la actual; rechazada, se descarta. */
+  private async resolveAvatarReview(
+    manager: EntityManager,
+    subject: User,
+    approve: boolean,
+  ): Promise<StoredFile[]> {
+    const pending = subject.pendingAvatarFileId;
+    if (!pending) return [];
+    if (!approve) {
+      await manager.getRepository(User).update(subject.id, { pendingAvatarFileId: null });
+      return this.uploads.markDeleted(manager, [pending]);
+    }
+    await manager
+      .getRepository(User)
+      .update(subject.id, { avatarFileId: pending, pendingAvatarFileId: null });
+    return this.uploads.markDeleted(manager, subject.avatarFileId ? [subject.avatarFileId] : []);
+  }
+
+  private async closeOpenAvatarReview(
+    manager: EntityManager,
+    admin: AuthUser,
+    userId: string,
+  ): Promise<void> {
+    await manager.getRepository(IdentityVerification).update(
+      { userId, kind: VerificationKind.AVATAR_CHANGE, status: VerificationStatus.REQUIRES_REVIEW },
+      {
+        status: VerificationStatus.REJECTED,
+        decisionSource: DecisionSource.ADMIN,
+        decidedBy: admin.id,
+        decidedAt: new Date(),
+        reasonCode: 'IDENTITY_REVOKED',
+      },
+    );
+  }
+
+  private async nextAttemptNumber(manager: EntityManager, userId: string): Promise<number> {
+    const rows: Array<{ last: number | null }> = await manager.query(
+      'SELECT max(attempt_number) AS last FROM identity_verifications WHERE user_id = $1',
+      [userId],
+    );
+    return (rows[0]?.last ?? 0) + 1;
+  }
   /** Requisitos para verificar la identidad (ADR 0006): email verificado y foto de perfil. */
   private assertProfileComplete(user: User): void {
     const missing: ApiErrorDetail[] = [];
@@ -313,7 +446,7 @@ export class IdentityVerificationService {
       .getRepository(User)
       .findBy({ id: In([...new Set(userIds)]) });
     const avatars = await this.uploads.publicUrls(
-      users.flatMap((u) => (u.avatarFileId ? [u.avatarFileId] : [])),
+      users.flatMap((u) => [u.avatarFileId, u.pendingAvatarFileId].filter((id) => id !== null)),
     );
     for (const u of users) {
       subjects.set(u.id, {
@@ -324,6 +457,9 @@ export class IdentityVerificationService {
         email: u.email,
         phone: u.phone,
         avatarUrl: u.avatarFileId ? (avatars.get(u.avatarFileId) ?? null) : null,
+        pendingAvatarUrl: u.pendingAvatarFileId
+          ? (avatars.get(u.pendingAvatarFileId) ?? null)
+          : null,
       });
     }
     return subjects;
@@ -365,7 +501,7 @@ export class IdentityVerificationService {
   private findOpenAttempt(userId: string): Promise<IdentityVerification | null> {
     return this.dataSource
       .getRepository(IdentityVerification)
-      .findOneBy({ userId, status: In([...OPEN_STATUSES]) });
+      .findOneBy({ userId, kind: VerificationKind.IDENTITY, status: In([...OPEN_STATUSES]) });
   }
 
   private findLatest(userId: string): Promise<IdentityVerification | null> {

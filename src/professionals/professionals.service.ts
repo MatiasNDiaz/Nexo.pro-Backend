@@ -6,6 +6,9 @@ import { Profession } from '../professions/entities/profession.entity';
 import { ProfessionalProfession } from './entities/professional-profession.entity';
 import { ProfessionalProfile } from './entities/professional-profile.entity';
 import { ProfessionalServiceArea } from './entities/professional-service-area.entity';
+import { profileSlug } from './profile-slug';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { User } from '../users/entities/user.entity';
 
 /** Zona de trabajo pedida: un barrio por nombre, o toda la localidad si no hay nombre (ADR 0010). */
 export interface ServiceAreaInput {
@@ -22,6 +25,7 @@ export interface ServiceAreaInput {
 export class ProfessionalsService {
   constructor(
     private readonly neighborhoods: NeighborhoodsService,
+    private readonly subscriptions: SubscriptionsService,
     @Inject(authConfig.KEY) private readonly config: AuthConfig,
   ) {}
 
@@ -40,14 +44,24 @@ export class ProfessionalsService {
         message: 'La profesión no existe.',
       });
     }
-    const profile = manager.getRepository(ProfessionalProfile).create({ userId });
+    const user = await manager.getRepository(User).findOneByOrFail({ id: userId });
+    const profile = manager
+      .getRepository(ProfessionalProfile)
+      .create({ userId, slug: profileSlug(user.firstName, user.lastName) });
     await manager.getRepository(ProfessionalProfile).insert(profile);
+    // Prueba de 30 días desde hoy, solo si nunca tuvo una (ADR 0017; cambio de rol: ADR 0012).
+    await this.subscriptions.startTrialIfFirst(manager, userId, new Date());
     await manager.getRepository(ProfessionalProfession).insert({
       professionalId: profile.id,
       professionId: profession.id,
       isPrimary: true,
     });
     return this.replaceServiceAreas(manager, profile.id, serviceAreas);
+  }
+
+  /** Un cliente que vuelve a ser profesional recibe la prueba solo si nunca tuvo una. */
+  grantTrialIfFirst(manager: EntityManager, userId: string): Promise<boolean> {
+    return this.subscriptions.startTrialIfFirst(manager, userId, new Date());
   }
 
   /** Perfil inactivo de un usuario que vuelve a ser profesional. Null si nunca tuvo uno. */

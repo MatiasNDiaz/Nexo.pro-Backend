@@ -31,7 +31,7 @@ import {
   Roles,
 } from '../common/decorators';
 import { CreateUploadDto, CreateUploadResponseDto, FileResponseDto } from './dto/uploads.dto';
-import { MAX_UPLOAD_BYTES } from './file-policies';
+import { LOCAL_UPLOAD_MAX_BYTES } from './file-policies';
 import { UploadsService } from './uploads.service';
 
 /** Lo que entrega multer en memoria (evita depender de @types/multer). */
@@ -80,7 +80,7 @@ export class UploadsController {
   @HttpCode(204)
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
-    FileInterceptor('file', { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 0 } }),
+    FileInterceptor('file', { limits: { fileSize: LOCAL_UPLOAD_MAX_BYTES, files: 1, fields: 0 } }),
   )
   async uploadContent(
     @CurrentUser() user: AuthUser,

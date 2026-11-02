@@ -12,7 +12,11 @@ import {
   Min,
 } from 'class-validator';
 import { UserRole, VerificationStatus } from '../../users/user.enums';
-import type { IdentityVerification } from '../entities/identity-verification.entity';
+import { FileResponseDto } from '../../uploads/dto/uploads.dto';
+import {
+  type IdentityVerification,
+  VerificationKind,
+} from '../entities/identity-verification.entity';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
@@ -74,6 +78,12 @@ export class ListVerificationsQueryDto {
 /** Lo que ve el propio usuario. Sin nota interna, sin id del admin, sin referencia del proveedor. */
 export class VerificationResponseDto {
   @ApiProperty({ nullable: true, type: String }) id: string | null;
+  @ApiProperty({
+    enum: VerificationKind,
+    nullable: true,
+    description: 'IDENTITY o AVATAR_CHANGE (revisión de una foto nueva, ADR 0019)',
+  })
+  kind: VerificationKind | null;
   @ApiProperty({ enum: VerificationStatus }) status: VerificationStatus;
   @ApiProperty({ nullable: true, type: String }) provider: string | null;
   @ApiProperty() attemptNumber: number;
@@ -84,6 +94,7 @@ export class VerificationResponseDto {
   static from(v: IdentityVerification | null): VerificationResponseDto {
     return {
       id: v?.id ?? null,
+      kind: v?.kind ?? null,
       status: v?.status ?? VerificationStatus.NOT_STARTED,
       provider: v?.provider ?? null,
       attemptNumber: v?.attemptNumber ?? 0,
@@ -113,6 +124,8 @@ export class VerificationSubjectDto {
   @ApiProperty() email: string;
   @ApiProperty() phone: string;
   @ApiProperty({ nullable: true, type: String }) avatarUrl: string | null;
+  @ApiProperty({ nullable: true, type: String, description: 'Foto nueva en revisión (ADR 0019)' })
+  pendingAvatarUrl: string | null;
 }
 
 /** Vista del admin. */
@@ -148,4 +161,9 @@ export class PaginationMetaDto {
 export class AdminVerificationListDto {
   @ApiProperty({ type: [AdminVerificationResponseDto] }) data: AdminVerificationResponseDto[];
   @ApiProperty({ type: PaginationMetaDto }) meta: PaginationMetaDto;
+}
+
+/** Respuesta al cambiar la foto: `underReview` si quedó pendiente de revisión (ADR 0019). */
+export class AvatarResponseDto extends FileResponseDto {
+  @ApiProperty() underReview: boolean;
 }

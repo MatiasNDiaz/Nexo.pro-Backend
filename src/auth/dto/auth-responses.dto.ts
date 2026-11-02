@@ -20,9 +20,18 @@ export class CurrentUserDto {
   @ApiProperty() emailVerified: boolean;
   @ApiProperty({ nullable: true, type: String, description: 'Foto de perfil (null si no cargó)' })
   avatarUrl: string | null;
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description: 'Foto nueva en revisión del admin (ADR 0019); en público se ve avatarUrl',
+  })
+  pendingAvatarUrl: string | null;
   @ApiProperty() createdAt: Date;
 
-  static from(user: User, avatarUrl: string | null): CurrentUserDto {
+  static from(
+    user: User,
+    avatars: { avatarUrl: string | null; pendingAvatarUrl: string | null },
+  ): CurrentUserDto {
     return {
       id: user.id,
       email: user.email,
@@ -36,7 +45,7 @@ export class CurrentUserDto {
           : null,
       verificationStatus: user.verificationStatus,
       emailVerified: user.emailVerifiedAt !== null,
-      avatarUrl,
+      ...avatars,
       createdAt: user.createdAt,
     };
   }

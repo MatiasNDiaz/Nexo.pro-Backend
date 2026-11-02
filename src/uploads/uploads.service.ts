@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Inject,
@@ -17,6 +18,7 @@ import {
   type StorageProvider,
   type StoredObjectInfo,
 } from '../integrations/storage/storage.provider';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { User } from '../users/entities/user.entity';
 import type { CreateUploadDto, CreateUploadResponseDto, FileResponseDto } from './dto/uploads.dto';
 import { StoredFile } from './entities/stored-file.entity';
@@ -32,12 +34,25 @@ import { FileKind, FilePurpose, FileStatus, FileVisibility } from './file.enums'
 const notFound = () =>
   new NotFoundException({ code: 'FILE_NOT_FOUND', message: 'El archivo no existe.' });
 
+const TYPE_MESSAGES: Record<FileKind, string> = {
+  [FileKind.IMAGE]: 'La imagen tiene que ser JPG, PNG o WebP.',
+  [FileKind.VIDEO]: 'El video tiene que ser MP4 o MOV.',
+  [FileKind.DOCUMENT]: 'El documento tiene que ser PDF.',
+};
+
 /** Rechazo de una subida: el archivo pasa a REJECTED y su binario se borra. */
 interface Rejection {
   status: HttpStatus;
   code: string;
   message: string;
 }
+
+/** Sin prueba ni plan vigente no se carga contenido profesional (FI §6.5). */
+export const subscriptionRequired = () =>
+  new ForbiddenException({
+    code: 'SUBSCRIPTION_REQUIRED',
+    message: 'Necesitás una prueba o un plan vigente para cargar contenido.',
+  });
 
 /**
  * Archivos (ADR 0018). Flujo: (1) `create` registra el archivo y devuelve un ticket para subir
@@ -50,17 +65,32 @@ export class UploadsService {
 
   constructor(
     private readonly dataSource: DataSource,
+    private readonly subscriptions: SubscriptionsService,
     @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
   ) {}
 
   async create(user: AuthUser, dto: CreateUploadDto): Promise<CreateUploadResponseDto> {
     const policy = FILE_POLICIES[dto.purpose];
+    if (!policy.roles.includes(user.role)) {
+      throw new ForbiddenException({
+        code: 'FILE_PURPOSE_NOT_ALLOWED',
+        message: 'Tu cuenta no puede subir este tipo de archivo.',
+      });
+    }
     if (!policy.kinds.includes(dto.kind)) {
       throw new BadRequestException({
         code: 'INVALID_FILE_KIND',
         message: `Para ${dto.purpose} solo se admite: ${policy.kinds.join(', ')}.`,
       });
     }
+    const maxBytes = await this.maxBytesFor(user.id, dto.purpose, dto.kind);
+    if (maxBytes <= 0) {
+      throw new ForbiddenException({
+        code: 'FILE_KIND_NOT_IN_PLAN',
+        message: 'Tu plan no incluye este tipo de archivo.',
+      });
+    }
+
     const repository = this.dataSource.getRepository(StoredFile);
     const pending = await repository.countBy({
       ownerUserId: user.id,
@@ -77,26 +107,24 @@ export class UploadsService {
     }
 
     const id = randomUUID();
-    const file = repository.create({
-      id,
-      ownerUserId: user.id,
-      provider: this.storage.code,
-      storageKey: this.storage.storageKeyFor(policy.folder, id),
-      purpose: dto.purpose,
-      kind: dto.kind,
-      visibility: policy.visibility,
-      status: FileStatus.PENDING_UPLOAD,
-    });
-    await repository.insert(file);
+    await repository.insert(
+      repository.create({
+        id,
+        ownerUserId: user.id,
+        provider: this.storage.code,
+        storageKey: this.storage.storageKeyFor(policy.folder, id),
+        purpose: dto.purpose,
+        kind: dto.kind,
+        visibility: policy.visibility,
+        status: FileStatus.PENDING_UPLOAD,
+      }),
+    );
     const saved = await repository.findOneByOrFail({ id });
     const ticket = this.storage.createUploadTicket({
       storageKey: saved.storageKey,
       kind: saved.kind,
     });
-    return {
-      file: this.toResponse(saved),
-      upload: { ...ticket, maxBytes: policy.maxBytes[saved.kind] },
-    };
+    return { file: this.toResponse(saved), upload: { ...ticket, maxBytes } };
   }
 
   /** Confirma la subida. Idempotente: un archivo ya READY se devuelve tal cual. */
@@ -116,7 +144,8 @@ export class UploadsService {
       });
     }
 
-    const rejection = this.validate(file, info);
+    const maxBytes = await this.maxBytesFor(user.id, file.purpose, file.kind);
+    const rejection = this.validate(file, info, maxBytes);
     if (rejection) {
       const result = await repository.update(
         { id: file.id, status: FileStatus.PENDING_UPLOAD },
@@ -144,48 +173,57 @@ export class UploadsService {
   }
 
   /**
-   * Foto de perfil (paso 2 del registro, ADR 0006). La anterior pasa a DELETED y se borra del
-   * proveedor después del commit.
+   * Bloquea un archivo propio, confirmado y del propósito pedido, para usarlo (foto, medio,
+   * certificado). Corre en la transacción del llamador.
    */
-  async setAvatar(user: AuthUser, fileId: string): Promise<FileResponseDto> {
-    const { file, replaced } = await this.dataSource.transaction(async (manager) => {
-      const owner = await manager
-        .getRepository(User)
-        .findOne({ where: { id: user.id }, lock: { mode: 'pessimistic_write' } });
-      if (!owner) throw new NotFoundException();
-      const candidate = await this.lockOwn(manager, user.id, fileId);
-      if (candidate.purpose !== FilePurpose.AVATAR) {
-        throw new BadRequestException({
-          code: 'WRONG_FILE_PURPOSE',
-          message: 'Ese archivo no es una foto de perfil.',
-        });
-      }
-      if (candidate.status !== FileStatus.READY) {
-        throw new ConflictException({
-          code: 'FILE_NOT_READY',
-          message: 'Confirmá la subida antes de usar el archivo.',
-        });
-      }
-      if (owner.avatarFileId === candidate.id) return { file: candidate, replaced: null };
-
-      let previous: StoredFile | null = null;
-      if (owner.avatarFileId) {
-        previous = await manager.getRepository(StoredFile).findOneBy({ id: owner.avatarFileId });
-        await manager
-          .getRepository(StoredFile)
-          .update(owner.avatarFileId, { status: FileStatus.DELETED });
-      }
-      await manager.getRepository(User).update(owner.id, { avatarFileId: candidate.id });
-      return { file: candidate, replaced: previous };
-    });
-    if (replaced) await this.deleteFromStorage([replaced]);
-    return this.toResponse(file);
+  async lockReadyFile(
+    manager: EntityManager,
+    userId: string,
+    fileId: string,
+    purpose: FilePurpose,
+  ): Promise<StoredFile> {
+    const file = await manager
+      .getRepository(StoredFile)
+      .findOne({ where: { id: fileId }, lock: { mode: 'pessimistic_write' } });
+    if (!file || file.ownerUserId !== userId) throw notFound();
+    if (file.purpose !== purpose) {
+      throw new BadRequestException({
+        code: 'WRONG_FILE_PURPOSE',
+        message: 'Ese archivo se subió para otro uso.',
+      });
+    }
+    if (file.status !== FileStatus.READY) {
+      throw new ConflictException({
+        code: 'FILE_NOT_READY',
+        message: 'Confirmá la subida antes de usar el archivo.',
+      });
+    }
+    return file;
   }
 
-  /** URL de la foto de perfil, o null si no tiene. */
-  async avatarUrl(avatarFileId: string | null): Promise<string | null> {
-    if (!avatarFileId) return null;
-    return (await this.publicUrls([avatarFileId])).get(avatarFileId) ?? null;
+  /** Marca DELETED (en la transacción del llamador); el binario se borra después del commit. */
+  async markDeleted(manager: EntityManager, fileIds: string[]): Promise<StoredFile[]> {
+    if (!fileIds.length) return [];
+    const files = await manager.getRepository(StoredFile).findBy({ id: In(fileIds) });
+    await manager
+      .getRepository(StoredFile)
+      .update({ id: In(fileIds) }, { status: FileStatus.DELETED });
+    return files;
+  }
+
+  /** Foto de perfil pública y, si hay, la foto nueva en revisión (ADR 0019). */
+  async avatarUrls(user: {
+    avatarFileId: string | null;
+    pendingAvatarFileId: string | null;
+  }): Promise<{ avatarUrl: string | null; pendingAvatarUrl: string | null }> {
+    const ids = [user.avatarFileId, user.pendingAvatarFileId].filter((id) => id !== null);
+    const urls = await this.publicUrls(ids);
+    return {
+      avatarUrl: user.avatarFileId ? (urls.get(user.avatarFileId) ?? null) : null,
+      pendingAvatarUrl: user.pendingAvatarFileId
+        ? (urls.get(user.pendingAvatarFileId) ?? null)
+        : null,
+    };
   }
 
   /** URLs públicas de varios archivos en una sola consulta (los que no estén listos no aparecen). */
@@ -205,7 +243,7 @@ export class UploadsService {
     const local = this.localStorage();
     const file = await this.findOwn(user.id, fileId);
     this.assertPending(file);
-    const maxBytes = FILE_POLICIES[file.purpose].maxBytes[file.kind];
+    const maxBytes = await this.maxBytesFor(user.id, file.purpose, file.kind);
     if (data.length > maxBytes) throw this.tooLarge(maxBytes);
     await local.write(file.storageKey, data);
   }
@@ -255,7 +293,9 @@ export class UploadsService {
    * Corre en la transacción del llamador; los binarios se borran después con `deleteFromStorage`.
    */
   async detachAllFrom(manager: EntityManager, userId: string): Promise<StoredFile[]> {
-    await manager.getRepository(User).update(userId, { avatarFileId: null });
+    await manager
+      .getRepository(User)
+      .update(userId, { avatarFileId: null, pendingAvatarFileId: null });
     const files = await manager.getRepository(StoredFile).findBy({
       ownerUserId: userId,
       status: Not(In([FileStatus.DELETED, FileStatus.REJECTED])),
@@ -293,23 +333,28 @@ export class UploadsService {
     };
   }
 
-  private urlOf(file: StoredFile): string | null {
+  urlOf(file: StoredFile): string | null {
     if (file.status !== FileStatus.READY || file.visibility !== FileVisibility.PUBLIC) return null;
     return this.storage.publicUrl(file.storageKey, file.kind, file.id);
   }
 
-  private validate(file: StoredFile, info: StoredObjectInfo): Rejection | null {
+  /** Peso máximo para ese usuario. Lanza 403 si el propósito exige plan y no tiene uno vigente. */
+  private async maxBytesFor(userId: string, purpose: FilePurpose, kind: FileKind) {
+    const policy = FILE_POLICIES[purpose];
+    if (!policy.needsPlan) return policy.maxBytes(kind, null);
+    const plan = await this.subscriptions.livePlan(userId);
+    if (!plan) throw subscriptionRequired();
+    return policy.maxBytes(kind, plan);
+  }
+
+  private validate(file: StoredFile, info: StoredObjectInfo, maxBytes: number): Rejection | null {
     if (!info.mimeType || !ALLOWED_MIME_TYPES[file.kind].includes(info.mimeType)) {
       return {
         status: HttpStatus.UNSUPPORTED_MEDIA_TYPE,
         code: 'UNSUPPORTED_FILE_TYPE',
-        message:
-          file.kind === FileKind.IMAGE
-            ? 'La imagen tiene que ser JPG, PNG o WebP.'
-            : 'El video tiene que ser MP4 o MOV.',
+        message: TYPE_MESSAGES[file.kind],
       };
     }
-    const maxBytes = FILE_POLICIES[file.purpose].maxBytes[file.kind];
     if (info.sizeBytes > maxBytes) {
       const { code, message } = this.tooLarge(maxBytes).getResponse() as Rejection;
       return { status: HttpStatus.PAYLOAD_TOO_LARGE, code, message };
@@ -347,14 +392,6 @@ export class UploadsService {
   /** Un archivo ajeno responde igual que uno inexistente (no revela ids de otros). */
   private async findOwn(userId: string, fileId: string): Promise<StoredFile> {
     const file = await this.dataSource.getRepository(StoredFile).findOneBy({ id: fileId });
-    if (!file || file.ownerUserId !== userId) throw notFound();
-    return file;
-  }
-
-  private async lockOwn(manager: EntityManager, userId: string, fileId: string) {
-    const file = await manager
-      .getRepository(StoredFile)
-      .findOne({ where: { id: fileId }, lock: { mode: 'pessimistic_write' } });
     if (!file || file.ownerUserId !== userId) throw notFound();
     return file;
   }

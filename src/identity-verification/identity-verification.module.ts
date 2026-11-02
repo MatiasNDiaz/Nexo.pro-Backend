@@ -17,5 +17,6 @@ import { IdentityVerificationService } from './identity-verification.service';
     IdentityWebhookController,
   ],
   providers: [IdentityVerificationService],
+  exports: [IdentityVerificationService],
 })
 export class IdentityVerificationModule {}

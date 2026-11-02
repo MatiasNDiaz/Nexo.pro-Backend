@@ -200,7 +200,7 @@ export class AuthController {
   @ApiOkResponse({ type: CurrentUserDto })
   async me(@CurrentUser() user: AuthUser): Promise<CurrentUserDto> {
     const current = await this.auth.currentUser(user);
-    return CurrentUserDto.from(current, await this.uploads.avatarUrl(current.avatarFileId));
+    return CurrentUserDto.from(current, await this.uploads.avatarUrls(current));
   }
 
   /**
@@ -306,7 +306,7 @@ export class AuthController {
     );
     this.cookies.set(res, 'csrf', csrfCookie, this.secondsUntil(issued.session.familyExpiresAt));
     return {
-      user: CurrentUserDto.from(user, await this.uploads.avatarUrl(user.avatarFileId)),
+      user: CurrentUserDto.from(user, await this.uploads.avatarUrls(user)),
       csrfToken: this.csrf.tokenFor(issued.session.familyId, csrfCookie),
     };
   }

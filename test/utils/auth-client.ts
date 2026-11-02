@@ -199,6 +199,39 @@ export async function signInCustomer(
   return { client, email, id: (me.body as { id: string }).id };
 }
 
+/** Registra un profesional (una profesión, toda la localidad de Córdoba) y devuelve su email. */
+export async function registerProfessional(app: NestExpressApplication) {
+  const client = new Client(app);
+  const email = uniqueEmail('pro');
+  const res = await client.post('/auth/register', {
+    role: 'PROFESSIONAL',
+    email,
+    password: PASSWORD,
+    firstName: 'Juan',
+    lastName: 'Gómez',
+    phone: '3511234567',
+    professionId: await professionId(client),
+    serviceAreas: [{ localityId: await cordobaLocalityId(client) }],
+  });
+  if (res.status !== 202)
+    throw new Error(`Registro falló: ${res.status} ${JSON.stringify(res.body)}`);
+  return email;
+}
+
+/** Profesional registrado (con su prueba de 30 días), en el estado pedido y con sesión. */
+export async function signInProfessional(
+  app: NestExpressApplication,
+  status: AccountStatus = AccountStatus.ACTIVE,
+) {
+  const email = await registerProfessional(app);
+  await setStatus(app.get(DataSource), email, status);
+  const client = new Client(app);
+  const res = await client.login(email);
+  if (res.status !== 200) throw new Error(`Login falló: ${res.status}`);
+  const me = await client.get('/auth/me');
+  return { client, email, id: (me.body as { id: string }).id };
+}
+
 /** Parsea los Set-Cookie de una respuesta: nombre → atributos (en minúsculas). */
 export function parseSetCookies(header: string[] | string | undefined) {
   const list = Array.isArray(header) ? header : header ? [header] : [];
