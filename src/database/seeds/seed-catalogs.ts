@@ -4,7 +4,6 @@ import { LOCATIONS_SEED, PROFESSIONS_SEED, SUBSCRIPTION_PLANS_SEED } from './cat
 export interface SeedResult {
   provinces: number;
   localities: number;
-  neighborhoods: number;
   professions: number;
   plans: number;
 }
@@ -19,7 +18,6 @@ export function seedCatalogs(dataSource: DataSource): Promise<SeedResult> {
     const result: SeedResult = {
       provinces: 0,
       localities: 0,
-      neighborhoods: 0,
       professions: 0,
       plans: 0,
     };
@@ -30,32 +28,15 @@ export function seedCatalogs(dataSource: DataSource): Promise<SeedResult> {
         `INSERT INTO provinces (name) VALUES ($1) ON CONFLICT ((lower(name))) DO NOTHING`,
         [province.province],
       );
-      const provinceId = await idOf(manager, 'provinces', 'lower(name) = lower($1)', [
-        province.province,
-      ]);
+      const provinceId = await provinceIdOf(manager, province.province);
 
       for (const locality of province.localities) {
         result.localities += await insertIgnoring(
           manager,
           `INSERT INTO localities (province_id, name) VALUES ($1, $2)
            ON CONFLICT (province_id, (lower(name))) DO NOTHING`,
-          [provinceId, locality.name],
+          [provinceId, locality],
         );
-        const localityId = await idOf(
-          manager,
-          'localities',
-          'province_id = $1 AND lower(name) = lower($2)',
-          [provinceId, locality.name],
-        );
-
-        for (const neighborhood of locality.neighborhoods) {
-          result.neighborhoods += await insertIgnoring(
-            manager,
-            `INSERT INTO neighborhoods (locality_id, name) VALUES ($1, $2)
-             ON CONFLICT (locality_id, (lower(name))) DO NOTHING`,
-            [localityId, neighborhood],
-          );
-        }
       }
     }
 
@@ -107,18 +88,12 @@ async function insertIgnoring(
   return rows.length;
 }
 
-/** `table` y `where` son constantes de este archivo: nunca vienen de un usuario. */
-async function idOf(
-  manager: EntityManager,
-  table: 'provinces' | 'localities',
-  where: string,
-  params: unknown[],
-): Promise<string> {
+async function provinceIdOf(manager: EntityManager, name: string): Promise<string> {
   const rows: Array<{ id: string }> = await manager.query(
-    `SELECT id FROM ${table} WHERE ${where}`,
-    params,
+    `SELECT id FROM provinces WHERE lower(name) = lower($1)`,
+    [name],
   );
   const id = rows[0]?.id;
-  if (!id) throw new Error(`No se encontró la fila semilla en ${table}`);
+  if (!id) throw new Error('No se encontró la provincia semilla');
   return id;
 }

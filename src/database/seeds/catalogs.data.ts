@@ -6,29 +6,10 @@ import { ThemeLevel } from '../../subscriptions/entities/subscription-plan.entit
  */
 
 /**
- * Ubicaciones de EJEMPLO. No hay fuente oficial todavía: la lista completa de localidades y barrios
- * de Córdoba (y sus coordenadas) queda pendiente. Sin coordenadas para no inventarlas.
+ * Provincias y localidades. Los barrios NO se siembran: los crean los usuarios y los modera el
+ * admin (ADR 0010). La lista completa de localidades y sus coordenadas queda pendiente.
  */
-export const LOCATIONS_SEED = [
-  {
-    province: 'Córdoba',
-    localities: [
-      {
-        name: 'Córdoba',
-        neighborhoods: [
-          'Centro',
-          'Nueva Córdoba',
-          'General Paz',
-          'Alberdi',
-          'Alta Córdoba',
-          'Güemes',
-          'Cerro de las Rosas',
-          'Barrio Jardín',
-        ],
-      },
-    ],
-  },
-];
+export const LOCATIONS_SEED = [{ province: 'Córdoba', localities: ['Córdoba'] }];
 
 /** Oficios de EJEMPLO; el catálogo definitivo lo administra el admin (FI §7.1). */
 export const PROFESSIONS_SEED = [

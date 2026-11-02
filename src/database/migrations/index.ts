@@ -3,6 +3,10 @@ import { CreateAdminAuditLogs1793640001000 } from './1793640001000-CreateAdminAu
 import { CreateLocations1793640002000 } from './1793640002000-CreateLocations';
 import { CreateProfessions1793640003000 } from './1793640003000-CreateProfessions';
 import { CreateSubscriptionPlans1793640004000 } from './1793640004000-CreateSubscriptionPlans';
+import { CreateUsers1793640005000 } from './1793640005000-CreateUsers';
+import { UserCreatedNeighborhoods1793640006000 } from './1793640006000-UserCreatedNeighborhoods';
+import { CreateAuthTables1793640007000 } from './1793640007000-CreateAuthTables';
+import { CreateProfessionalProfiles1793640008000 } from './1793640008000-CreateProfessionalProfiles';
 
 /**
  * Lista explícita (en orden) de migraciones. Se registran a mano en vez de con un glob para que
@@ -15,4 +19,8 @@ export const MIGRATIONS = [
   CreateLocations1793640002000,
   CreateProfessions1793640003000,
   CreateSubscriptionPlans1793640004000,
+  CreateUsers1793640005000,
+  UserCreatedNeighborhoods1793640006000,
+  CreateAuthTables1793640007000,
+  CreateProfessionalProfiles1793640008000,
 ];

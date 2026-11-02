@@ -1,4 +1,14 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  type Relation,
+} from 'typeorm';
+import { User } from '../../users/entities/user.entity';
 
 export enum AuditResult {
   SUCCESS = 'SUCCESS',
@@ -20,9 +30,13 @@ export class AdminAuditLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  /** Null en eventos del sistema. La FK a `users` se agrega en la etapa 5. */
+  /** Null en eventos del sistema (p. ej. reutilización de un refresh token). */
   @Column({ type: 'uuid', nullable: true })
   actorId: string | null;
+
+  @ManyToOne(() => User, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'actor_id' })
+  actor?: Relation<User>;
 
   @Column({ type: 'varchar', length: 100 })
   action: string;

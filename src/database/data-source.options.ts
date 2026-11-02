@@ -1,5 +1,12 @@
 import type { DataSourceOptions } from 'typeorm';
 import { AdminAuditLog } from '../audit/entities/admin-audit-log.entity';
+import { AuthSession } from '../auth/entities/auth-session.entity';
+import { OneTimeToken } from '../auth/entities/one-time-token.entity';
+import { UserMfaSettings } from '../auth/entities/user-mfa-settings.entity';
+import { ProfessionalProfession } from '../professionals/entities/professional-profession.entity';
+import { ProfessionalProfile } from '../professionals/entities/professional-profile.entity';
+import { ProfessionalServiceArea } from '../professionals/entities/professional-service-area.entity';
+import { User } from '../users/entities/user.entity';
 import { Locality } from '../locations/entities/locality.entity';
 import { Neighborhood } from '../locations/entities/neighborhood.entity';
 import { Province } from '../locations/entities/province.entity';
@@ -16,6 +23,13 @@ export const ENTITIES = [
   Neighborhood,
   Profession,
   SubscriptionPlan,
+  User,
+  AuthSession,
+  OneTimeToken,
+  UserMfaSettings,
+  ProfessionalProfile,
+  ProfessionalProfession,
+  ProfessionalServiceArea,
 ];
 
 export interface ConnectionSettings {
