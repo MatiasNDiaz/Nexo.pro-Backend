@@ -8,3 +8,9 @@ export const numericToNumber: ValueTransformer = {
   to: (value: number | null | undefined) => value,
   from: (value: string | null) => (value === null ? null : Number(value)),
 };
+
+/** `bigint` llega del driver como string; pesos de archivos y similares entran holgados en un double. */
+export const bigintToNumber: ValueTransformer = {
+  to: (value: number | null | undefined) => value,
+  from: (value: string | null) => (value === null ? null : Number(value)),
+};

@@ -11,6 +11,8 @@ import { AccountLifecycle1793640009000 } from './1793640009000-AccountLifecycle'
 import { AccountDeletionGracePeriod1793640010000 } from './1793640010000-AccountDeletionGracePeriod';
 import { CreateStoredFiles1793640011000 } from './1793640011000-CreateStoredFiles';
 import { CreateIdentityVerification1793640012000 } from './1793640012000-CreateIdentityVerification';
+import { ProfilesMediaAvailability1793640013000 } from './1793640013000-ProfilesMediaAvailability';
+import { CreateSubscriptions1793640014000 } from './1793640014000-CreateSubscriptions';
 
 /**
  * Lista explícita (en orden) de migraciones. Se registran a mano en vez de con un glob para que
@@ -31,4 +33,6 @@ export const MIGRATIONS = [
   AccountDeletionGracePeriod1793640010000,
   CreateStoredFiles1793640011000,
   CreateIdentityVerification1793640012000,
+  ProfilesMediaAvailability1793640013000,
+  CreateSubscriptions1793640014000,
 ];

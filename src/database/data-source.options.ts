@@ -3,7 +3,14 @@ import { AdminAuditLog } from '../audit/entities/admin-audit-log.entity';
 import { AuthSession } from '../auth/entities/auth-session.entity';
 import { OneTimeToken } from '../auth/entities/one-time-token.entity';
 import { UserMfaSettings } from '../auth/entities/user-mfa-settings.entity';
+import {
+  AvailabilityException,
+  AvailabilitySlot,
+} from '../professionals/entities/availability.entity';
+import { ProfessionalCertification } from '../professionals/entities/professional-certification.entity';
+import { ProfessionalMedia } from '../professionals/entities/professional-media.entity';
 import { ProfessionalProfession } from '../professionals/entities/professional-profession.entity';
+import { ProfessionalSocialLink } from '../professionals/entities/professional-social-link.entity';
 import { ProfessionalProfile } from '../professionals/entities/professional-profile.entity';
 import { ProfessionalServiceArea } from '../professionals/entities/professional-service-area.entity';
 import { IdentityProviderEvent } from '../identity-verification/entities/identity-provider-event.entity';
@@ -15,6 +22,8 @@ import { Neighborhood } from '../locations/entities/neighborhood.entity';
 import { Province } from '../locations/entities/province.entity';
 import { Profession } from '../professions/entities/profession.entity';
 import { SubscriptionPlan } from '../subscriptions/entities/subscription-plan.entity';
+import { Subscription, SubscriptionHistory } from '../subscriptions/entities/subscription.entity';
+import { CustomerProfile } from '../users/entities/customer-profile.entity';
 import { MIGRATIONS } from './migrations';
 import { SnakeNamingStrategy } from './snake-naming.strategy';
 
@@ -36,6 +45,14 @@ export const ENTITIES = [
   StoredFile,
   IdentityVerification,
   IdentityProviderEvent,
+  CustomerProfile,
+  ProfessionalMedia,
+  ProfessionalCertification,
+  ProfessionalSocialLink,
+  AvailabilitySlot,
+  AvailabilityException,
+  Subscription,
+  SubscriptionHistory,
 ];
 
 export interface ConnectionSettings {

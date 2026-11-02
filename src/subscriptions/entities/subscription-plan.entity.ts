@@ -6,6 +6,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { bigintToNumber } from '../../database/transformers';
 
 export enum ThemeLevel {
   /** Plantilla predeterminada (Basic). */
@@ -23,6 +24,7 @@ export enum ThemeLevel {
 @Entity('subscription_plans')
 @Check('ck_subscription_plans_price', 'price_amount >= 0')
 @Check('ck_subscription_plans_currency', "currency ~ '^[A-Z]{3}$'")
+@Check('ck_subscription_plans_file_sizes', 'max_image_bytes > 0 AND max_video_bytes > 0')
 @Check(
   'ck_subscription_plans_limits',
   'max_professions >= 1 AND max_images >= 0 AND max_videos >= 0 AND max_video_seconds > 0 AND ranking_tier >= 0',
@@ -55,6 +57,13 @@ export class SubscriptionPlan {
 
   @Column({ type: 'smallint' })
   maxVideoSeconds: number;
+
+  /** Peso máximo por imagen del perfil (ADR 0018). Se lee como número. */
+  @Column({ type: 'bigint', transformer: bigintToNumber })
+  maxImageBytes: number;
+
+  @Column({ type: 'bigint', transformer: bigintToNumber })
+  maxVideoBytes: number;
 
   @Column({ type: 'enum', enum: ThemeLevel, enumName: 'theme_level' })
   themeLevel: ThemeLevel;

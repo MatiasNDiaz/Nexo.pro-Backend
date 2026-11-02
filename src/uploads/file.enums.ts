@@ -1,14 +1,20 @@
 /** Para qué se sube el archivo. Define tipos, peso máximo y visibilidad (`file-policies.ts`). */
 export enum FilePurpose {
   AVATAR = 'AVATAR',
+  /** Imágenes, videos y banner del perfil profesional (pesos según el plan). */
+  PROFILE_MEDIA = 'PROFILE_MEDIA',
+  /** Certificados (ADR 0020): imagen o PDF. */
+  CERTIFICATE = 'CERTIFICATE',
 }
 
 export enum FileKind {
   IMAGE = 'IMAGE',
   VIDEO = 'VIDEO',
+  /** PDF (certificados). */
+  DOCUMENT = 'DOCUMENT',
 }
 
-/** PUBLIC: se sirve sin sesión (foto de perfil, medios). PRIVATE: solo con permiso (certificados). */
+/** PUBLIC: se sirve sin sesión (foto, medios y certificados, ADR 0020). PRIVATE: reservado (chat, evidencia). */
 export enum FileVisibility {
   PUBLIC = 'PUBLIC',
   PRIVATE = 'PRIVATE',

@@ -53,8 +53,8 @@ export function seedCatalogs(dataSource: DataSource): Promise<SeedResult> {
         manager,
         `INSERT INTO subscription_plans (code, name, price_amount, max_professions, max_images,
            max_videos, max_video_seconds, theme_level, ranking_tier, availability_alerts,
-           custom_alert_message, metrics_enabled, chatbot_enabled)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           custom_alert_message, metrics_enabled, chatbot_enabled, max_image_bytes, max_video_bytes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
          ON CONFLICT (code) DO NOTHING`,
         [
           plan.code,
@@ -70,6 +70,8 @@ export function seedCatalogs(dataSource: DataSource): Promise<SeedResult> {
           plan.customAlertMessage,
           plan.metricsEnabled,
           plan.chatbotEnabled,
+          plan.maxImageBytes,
+          plan.maxVideoBytes,
         ],
       );
     }

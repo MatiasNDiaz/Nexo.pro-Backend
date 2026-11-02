@@ -14,6 +14,12 @@ import {
 import { User } from '../../users/entities/user.entity';
 import { VerificationStatus } from '../../users/user.enums';
 
+/** IDENTITY: verificación de la persona. AVATAR_CHANGE: revisión de una foto nueva (ADR 0019). */
+export enum VerificationKind {
+  IDENTITY = 'IDENTITY',
+  AVATAR_CHANGE = 'AVATAR_CHANGE',
+}
+
 export enum DecisionSource {
   PROVIDER = 'PROVIDER',
   ADMIN = 'ADMIN',
@@ -43,6 +49,14 @@ export class IdentityVerification {
   @ManyToOne(() => User, { onDelete: 'RESTRICT', nullable: false })
   @JoinColumn({ name: 'user_id' })
   user?: Relation<User>;
+
+  @Column({
+    type: 'enum',
+    enum: VerificationKind,
+    enumName: 'verification_kind',
+    default: VerificationKind.IDENTITY,
+  })
+  kind: VerificationKind;
 
   @Column({ type: 'enum', enum: VerificationStatus, enumName: 'verification_status' })
   status: VerificationStatus;

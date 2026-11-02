@@ -10,6 +10,7 @@ import {
   type Relation,
   UpdateDateColumn,
 } from 'typeorm';
+import { bigintToNumber } from '../../database/transformers';
 import { User } from '../../users/entities/user.entity';
 import {
   FileKind,
@@ -18,12 +19,6 @@ import {
   FileVisibility,
   StorageProviderCode,
 } from '../file.enums';
-
-/** `bigint` llega del driver como string; los pesos entran holgados en un double. */
-const bigintToNumber = {
-  to: (value: number | null | undefined) => value,
-  from: (value: string | null) => (value === null ? null : Number(value)),
-};
 
 /**
  * Metadatos de un archivo (ADR 0018). El binario vive en el proveedor; acá solo lo que la API

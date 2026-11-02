@@ -9,9 +9,10 @@ import {
   type Relation,
 } from 'typeorm';
 import { Profession } from '../../professions/entities/profession.entity';
+import { ProItemStatus } from '../professional.enums';
 import { ProfessionalProfile } from './professional-profile.entity';
 
-/** Oficios que ofrece un profesional. Cuántos puede tener lo define su plan (etapa 7). */
+/** Oficios que ofrece un profesional. Cuántos puede tener lo define su plan. */
 @Entity('professional_professions')
 // Una sola profesión principal por profesional: índice parcial creado en la migración.
 @Index('uq_professional_professions_primary', { synchronize: false })
@@ -33,6 +34,14 @@ export class ProfessionalProfession {
 
   @Column({ type: 'boolean', default: false })
   isPrimary: boolean;
+
+  @Column({
+    type: 'enum',
+    enum: ProItemStatus,
+    enumName: 'pro_item_status',
+    default: ProItemStatus.ACTIVE,
+  })
+  status: ProItemStatus;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;

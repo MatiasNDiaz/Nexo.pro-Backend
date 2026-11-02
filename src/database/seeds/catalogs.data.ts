@@ -25,10 +25,12 @@ export const PROFESSIONS_SEED = [
   { name: 'Jardinero', slug: 'jardinero' },
 ];
 
+const MB = 1024 * 1024;
+
 /**
  * Planes (FI §6.1 y §6.3). Precios de referencia en ARS con impuestos incluidos, a confirmar antes
  * de producción. Premium: 5 imágenes y 2 videos (confirmado por el fundador el 02/11/2026).
- * Medium sin métricas: "no confirmado" en FI §6.3.
+ * Medium sin métricas: "no confirmado" en FI §6.3. Pesos por archivo aprobados el 02/11/2026 (ADR 0018).
  */
 export const SUBSCRIPTION_PLANS_SEED = [
   {
@@ -45,6 +47,8 @@ export const SUBSCRIPTION_PLANS_SEED = [
     customAlertMessage: false,
     metricsEnabled: false,
     chatbotEnabled: false,
+    maxImageBytes: 5 * MB,
+    maxVideoBytes: 30 * MB,
   },
   {
     code: 'MEDIUM',
@@ -60,6 +64,8 @@ export const SUBSCRIPTION_PLANS_SEED = [
     customAlertMessage: false,
     metricsEnabled: false,
     chatbotEnabled: false,
+    maxImageBytes: 5 * MB,
+    maxVideoBytes: 30 * MB,
   },
   {
     code: 'PREMIUM',
@@ -75,5 +81,7 @@ export const SUBSCRIPTION_PLANS_SEED = [
     customAlertMessage: true,
     metricsEnabled: true,
     chatbotEnabled: true,
+    maxImageBytes: 10 * MB,
+    maxVideoBytes: 50 * MB,
   },
 ];

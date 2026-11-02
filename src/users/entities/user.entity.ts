@@ -24,6 +24,7 @@ import { AccountStatus, UserRole, VerificationStatus } from '../user.enums';
 @Index('uq_users_email', { synchronize: false })
 @Index(['neighborhoodId'])
 @Index(['avatarFileId'])
+@Index(['pendingAvatarFileId'])
 // Parcial (solo cuentas en gracia): creado en la migración.
 @Index('ix_users_deletion_scheduled_for', { synchronize: false })
 @Check('ck_users_failed_login_attempts', 'failed_login_attempts >= 0')
@@ -96,6 +97,14 @@ export class User {
   @ManyToOne(() => StoredFile, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'avatar_file_id' })
   avatarFile?: Relation<StoredFile>;
+
+  /** Foto nueva en revisión del admin, con la identidad ya aprobada (ADR 0019). No es pública. */
+  @Column({ type: 'uuid', nullable: true })
+  pendingAvatarFileId: string | null;
+
+  @ManyToOne(() => StoredFile, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'pending_avatar_file_id' })
+  pendingAvatarFile?: Relation<StoredFile>;
 
   @Column({ type: 'timestamptz', nullable: true })
   emailVerifiedAt: Date | null;
