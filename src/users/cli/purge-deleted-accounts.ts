@@ -1,17 +1,25 @@
 import { NestFactory } from '@nestjs/core';
+import { DataSource } from 'typeorm';
 import { AppModule } from '../../app.module';
+import { ADVISORY_LOCKS, runExclusive } from '../../database/advisory-lock';
 import { AccountsService } from '../accounts.service';
 
 /**
- * `npm run accounts:purge`: anonimiza las cuentas cuyo período de gracia venció (ADR 0016).
- * Correrlo una vez por día (en producción, un cron del proveedor:
- * `node dist/users/cli/purge-deleted-accounts.js`). Es idempotente.
+ * `npm run accounts:purge`: anonimiza ya las cuentas cuyo período de gracia venció (ADR 0016).
+ * La API lo hace sola todos los días (`AccountsPurgeJob`); este comando sirve para correrlo a mano.
+ * Comparte el lock con la tarea diaria, así nunca corren a la vez. Es idempotente.
  */
 async function main(): Promise<void> {
   const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error'] });
   try {
-    const purged = await app.get(AccountsService).purgeExpiredDeletions();
-    process.stdout.write(`Cuentas anonimizadas: ${purged}\n`);
+    const outcome = await runExclusive(app.get(DataSource), ADVISORY_LOCKS.ACCOUNTS_PURGE, () =>
+      app.get(AccountsService).purgeExpiredDeletions(),
+    );
+    process.stdout.write(
+      outcome.ran
+        ? `Cuentas anonimizadas: ${outcome.result}\n`
+        : 'La purga ya está corriendo en otro proceso.\n',
+    );
   } finally {
     await app.close();
   }

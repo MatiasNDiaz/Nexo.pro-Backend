@@ -35,9 +35,13 @@ services:
       DATABASE_MIGRATIONS_URL: postgres://${POSTGRES_USER:-nexo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nexo_dev}
     ports:
       - '127.0.0.1:3001:3001'
+    volumes:
+      # Archivos subidos con el adaptador local (STORAGE_PROVIDER=local).
+      - uploads:/app/.uploads
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
   pgdata:
+  uploads:

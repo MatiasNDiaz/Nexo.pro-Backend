@@ -46,6 +46,7 @@ import {
   SessionsService,
 } from './services/sessions.service';
 import { TokenService } from './services/token.service';
+import { UploadsService } from '../uploads/uploads.service';
 import type { User } from '../users/entities/user.entity';
 
 const MINUTE = 60_000;
@@ -67,6 +68,7 @@ export class AuthController {
     private readonly tokens: TokenService,
     private readonly cookies: AuthCookiesService,
     private readonly csrf: CsrfService,
+    private readonly uploads: UploadsService,
     @Inject(securityConfig.KEY) private readonly security: SecurityConfig,
   ) {}
 
@@ -197,7 +199,8 @@ export class AuthController {
   @ApiCookieAuth()
   @ApiOkResponse({ type: CurrentUserDto })
   async me(@CurrentUser() user: AuthUser): Promise<CurrentUserDto> {
-    return CurrentUserDto.from(await this.auth.currentUser(user));
+    const current = await this.auth.currentUser(user);
+    return CurrentUserDto.from(current, await this.uploads.avatarUrl(current.avatarFileId));
   }
 
   /**
@@ -303,7 +306,7 @@ export class AuthController {
     );
     this.cookies.set(res, 'csrf', csrfCookie, this.secondsUntil(issued.session.familyExpiresAt));
     return {
-      user: CurrentUserDto.from(user),
+      user: CurrentUserDto.from(user, await this.uploads.avatarUrl(user.avatarFileId)),
       csrfToken: this.csrf.tokenFor(issued.session.familyId, csrfCookie),
     };
   }

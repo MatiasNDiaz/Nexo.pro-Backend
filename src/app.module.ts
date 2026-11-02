@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { AuditModule } from './audit/audit.module';
@@ -20,11 +21,14 @@ import { databaseConfig } from './config/database.config';
 import { validateEnv } from './config/env.validation';
 import { mailConfig } from './config/mail.config';
 import { securityConfig } from './config/security.config';
+import { identityConfig, storageConfig } from './config/storage.config';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
+import { IdentityVerificationModule } from './identity-verification/identity-verification.module';
 import { MailModule } from './integrations/mail/mail.module';
 import { LocationsModule } from './locations/locations.module';
 import { ProfessionsModule } from './professions/professions.module';
+import { UploadsModule } from './uploads/uploads.module';
 import { UsersModule } from './users/users.module';
 
 const nodeEnv = process.env.NODE_ENV ?? 'development';
@@ -36,7 +40,15 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
       cache: true,
       // `.local` primero: ahí van los secretos de cada desarrollador (no se versiona).
       envFilePath: [`.env.${nodeEnv}.local`, `.env.${nodeEnv}`],
-      load: [appConfig, databaseConfig, authConfig, securityConfig, mailConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        authConfig,
+        securityConfig,
+        mailConfig,
+        storageConfig,
+        identityConfig,
+      ],
       // Falla al iniciar si el entorno es inválido. Devuelve las variables crudas para que
       // @nestjs/config las copie a process.env (solo copia strings/números/booleanos, no listas);
       // la versión tipada la arman los namespaces de src/config con la misma función.
@@ -56,6 +68,11 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
       ],
     }),
     EventEmitterModule.forRoot(),
+    // Tareas programadas (purga diaria, limpieza de subidas). Apagadas en los tests.
+    ScheduleModule.forRootAsync({
+      inject: [appConfig.KEY],
+      useFactory: (config: AppConfig) => ({ cronJobs: config.nodeEnv !== 'test' }),
+    }),
     DatabaseModule,
     AuditModule,
     MailModule,
@@ -64,6 +81,8 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
     ProfessionsModule,
     AuthModule,
     UsersModule,
+    UploadsModule,
+    IdentityVerificationModule,
   ],
   providers: [
     // Guards globales, en este orden (plan §9.8). Denegación por defecto: solo `@Public()` pasa

@@ -51,6 +51,22 @@ export class Client {
     return this.agent.delete(`/api/v1${path}`).set('X-CSRF-Token', this.csrfToken);
   }
 
+  put(path: string, body?: object) {
+    return this.send('PUT', path, body);
+  }
+
+  patch(path: string, body?: object) {
+    return this.send('PATCH', path, body);
+  }
+
+  /** Cualquier método, con el token CSRF actual. */
+  send(method: string, path: string, body?: object) {
+    const verb = method.toLowerCase() as 'post';
+    return this.agent[verb](`/api/v1${path}`)
+      .set('X-CSRF-Token', this.csrfToken)
+      .send(body ?? {});
+  }
+
   async login(email: string, password = PASSWORD) {
     const res = await this.post('/auth/login', { email, password });
     if (res.status === 200 && typeof res.body.csrfToken === 'string')

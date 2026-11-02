@@ -24,6 +24,10 @@ const PUBLIC_ROUTES = new Set([
   'POST /api/v1/auth/email/verify',
   'POST /api/v1/auth/password/forgot',
   'POST /api/v1/auth/password/reset',
+  // Archivos públicos del adaptador local (en producción los sirve Cloudinary).
+  'GET /api/v1/uploads/:id/content',
+  // Webhook del proveedor de identidad: autenticado por firma, no por sesión.
+  'POST /api/v1/webhooks/identity',
 ]);
 
 interface RouteLayer {
@@ -97,10 +101,9 @@ describe('Seguridad de todas las rutas (e2e)', () => {
     const failures: string[] = [];
     for (const route of adminRoutes) {
       const path = concrete(route.path).replace('/api/v1', '');
-      const res =
-        route.method === 'DELETE'
-          ? await client.delete(path).send({ reason: 'intento de escalada de privilegios' })
-          : await client.post(path, { reason: 'intento de escalada de privilegios' });
+      const res = await client.send(route.method, path, {
+        reason: 'intento de escalada de privilegios',
+      });
       if (res.status !== 403) failures.push(`${route.method} ${route.path} → ${res.status}`);
     }
     expect(failures).toEqual([]);

@@ -3,6 +3,8 @@ import { DataSource, IsNull } from 'typeorm';
 import { AdminAuditLog } from '../src/audit/entities/admin-audit-log.entity';
 import { AuthSession } from '../src/auth/entities/auth-session.entity';
 import { ProfessionalProfile } from '../src/professionals/entities/professional-profile.entity';
+import { StoredFile } from '../src/uploads/entities/stored-file.entity';
+import { FileStatus } from '../src/uploads/file.enums';
 import { AccountsService } from '../src/users/accounts.service';
 import { User } from '../src/users/entities/user.entity';
 import { AccountStatus, VerificationStatus } from '../src/users/user.enums';
@@ -19,6 +21,7 @@ import {
   uniqueEmail,
 } from './utils/auth-client';
 import { createTestApp } from './utils/create-test-app';
+import { uploadAvatar } from './utils/uploads';
 
 const REASON = 'Motivo de prueba suficientemente largo';
 
@@ -246,8 +249,9 @@ describe('Ciclo de vida de la cuenta (e2e)', () => {
       expect((await new Client(app).login(user.email)).status).toBe(200);
     });
 
-    it('vencida la gracia, la purga anonimiza la cuenta y libera el email', async () => {
+    it('vencida la gracia, la purga anonimiza la cuenta, borra la foto y libera el email', async () => {
       const user = await signInCustomer(app);
+      const avatar = await uploadAvatar(user.client);
       await user.client.delete('/users/me').send({ password: PASSWORD });
       const accounts = app.get(AccountsService);
 
@@ -271,6 +275,10 @@ describe('Ciclo de vida de la cuenta (e2e)', () => {
         deletionScheduledFor: null,
       });
       expect(stored.deletedAt).not.toBeNull();
+      expect(stored.avatarFileId).toBeNull();
+      const file = await dataSource.getRepository(StoredFile).findOneByOrFail({ id: avatar.id });
+      expect(file.status).toBe(FileStatus.DELETED);
+      expect((await new Client(app).get(`/uploads/${avatar.id}/content`)).status).toBe(404);
       await expect(auditCount('ACCOUNT_ANONYMIZED', user.id)).resolves.toBe(1);
       // Ya no se puede restaurar (no existe para la API) y el email queda libre.
       expect((await admin.post(`/admin/users/${user.id}/restore`, { reason: REASON })).status).toBe(

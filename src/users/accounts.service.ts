@@ -18,6 +18,7 @@ import type { AuthUser } from '../common/decorators';
 import { type AuthConfig, authConfig } from '../config/auth.config';
 import { NeighborhoodsService } from '../locations/neighborhoods.service';
 import { ProfessionalsService } from '../professionals/professionals.service';
+import { UploadsService } from '../uploads/uploads.service';
 import { accountsDueForAnonymization, anonymizeAccount } from './account-anonymizer';
 import { ChangeRoleDto } from './dto/account-admin.dto';
 import { User } from './entities/user.entity';
@@ -43,6 +44,7 @@ export class AccountsService {
     private readonly passwords: PasswordService,
     private readonly neighborhoods: NeighborhoodsService,
     private readonly professionals: ProfessionalsService,
+    private readonly uploads: UploadsService,
     private readonly events: EventEmitter2,
     @Inject(authConfig.KEY) private readonly config: AuthConfig,
     @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
@@ -152,19 +154,21 @@ export class AccountsService {
   }
 
   /**
-   * Anonimiza las cuentas cuyo período de gracia venció. Lo corre el comando `accounts:purge`
-   * (programarlo una vez por día). Devuelve cuántas cuentas anonimizó.
+   * Anonimiza las cuentas cuyo período de gracia venció. Lo corren la tarea diaria
+   * (`AccountsPurgeJob`) y el comando `accounts:purge`. Devuelve cuántas cuentas anonimizó.
    */
   async purgeExpiredDeletions(now = new Date()): Promise<number> {
     const due = await accountsDueForAnonymization(this.dataSource.manager, now);
     let purged = 0;
     for (const userId of due) {
-      await this.dataSource.transaction(async (manager) => {
+      const files = await this.dataSource.transaction(async (manager) => {
         const user = await manager
           .getRepository(User)
           .findOne({ where: { id: userId }, lock: { mode: 'pessimistic_write' } });
         // Pudo haberse restaurado entre la búsqueda y el bloqueo.
-        if (!user?.deletionScheduledFor || user.deletionScheduledFor > now) return;
+        if (!user?.deletionScheduledFor || user.deletionScheduledFor > now) return null;
+        // La foto y los demás archivos son datos personales: se borran del proveedor.
+        const detached = await this.uploads.detachAllFrom(manager, user.id);
         await anonymizeAccount(manager, user.id);
         await this.audit.record(
           {
@@ -177,8 +181,11 @@ export class AccountsService {
           },
           manager,
         );
-        purged++;
+        return detached;
       });
+      if (!files) continue;
+      purged++;
+      await this.uploads.deleteFromStorage(files);
     }
     return purged;
   }

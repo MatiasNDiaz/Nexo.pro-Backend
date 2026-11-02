@@ -21,6 +21,9 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/package.json ./
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
+# Carpeta del adaptador de archivos local (solo desarrollo con docker compose; en producción los
+# archivos van a Cloudinary y la validación del entorno prohíbe el disco).
+RUN mkdir -p /app/.uploads && chown node:node /app/.uploads
 USER node
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

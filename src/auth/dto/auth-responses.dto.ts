@@ -18,9 +18,11 @@ export class CurrentUserDto {
   statusReason: string | null;
   @ApiProperty({ enum: VerificationStatus }) verificationStatus: VerificationStatus;
   @ApiProperty() emailVerified: boolean;
+  @ApiProperty({ nullable: true, type: String, description: 'Foto de perfil (null si no cargó)' })
+  avatarUrl: string | null;
   @ApiProperty() createdAt: Date;
 
-  static from(user: User): CurrentUserDto {
+  static from(user: User, avatarUrl: string | null): CurrentUserDto {
     return {
       id: user.id,
       email: user.email,
@@ -34,6 +36,7 @@ export class CurrentUserDto {
           : null,
       verificationStatus: user.verificationStatus,
       emailVerified: user.emailVerifiedAt !== null,
+      avatarUrl,
       createdAt: user.createdAt,
     };
   }

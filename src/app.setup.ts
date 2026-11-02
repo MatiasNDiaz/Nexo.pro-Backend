@@ -8,8 +8,11 @@ import { REQUEST_ID_HEADER } from './common/logging/logger.options';
 import { type AppConfig, appConfig } from './config/app.config';
 import { type AuthConfig, authConfig } from './config/auth.config';
 
-/** Opciones con las que se crea la app; las comparten `main.ts` y los tests e2e. */
-export const APP_CREATE_OPTIONS = { bodyParser: false, bufferLogs: true } as const;
+/**
+ * Opciones con las que se crea la app; las comparten `main.ts` y los tests e2e. `rawBody` guarda
+ * el cuerpo original (`req.rawBody`): los webhooks validan la firma sobre esos bytes exactos.
+ */
+export const APP_CREATE_OPTIONS = { bodyParser: false, bufferLogs: true, rawBody: true } as const;
 
 /**
  * Configuración HTTP de la aplicación. `main.ts` y los tests e2e usan esta misma función,
