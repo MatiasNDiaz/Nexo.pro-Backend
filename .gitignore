@@ -4,6 +4,10 @@ dist/
 coverage/
 *.tsbuildinfo
 
+# Archivos subidos en desarrollo y tests (adaptador de almacenamiento local)
+.uploads/
+.uploads-test/
+
 # Variables de entorno: solo se versionan las plantillas sin secretos
 .env
 .env.*

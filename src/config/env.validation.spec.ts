@@ -145,5 +145,58 @@ describe('validateEnv', () => {
         /FRONTEND_ORIGINS/,
       );
     });
+
+    it('prohíbe el almacenamiento en disco y el proveedor de identidad simulado', () => {
+      expect(() => validateEnv({ ...prod, STORAGE_PROVIDER: 'local' })).toThrow(/STORAGE_PROVIDER/);
+      expect(() =>
+        validateEnv({
+          ...prod,
+          IDENTITY_PROVIDER: 'fake',
+          FAKE_IDENTITY_WEBHOOK_SECRET: 'f'.repeat(40),
+        }),
+      ).toThrow(/IDENTITY_PROVIDER/);
+    });
+  });
+
+  describe('archivos e identidad', () => {
+    it('por defecto: disco local y verificación manual con 3 intentos', () => {
+      expect(validateEnv(base)).toMatchObject({
+        STORAGE_PROVIDER: 'local',
+        STORAGE_LOCAL_DIR: '.uploads',
+        IDENTITY_PROVIDER: 'manual',
+        IDENTITY_MAX_ATTEMPTS: 3,
+      });
+    });
+
+    it('Cloudinary exige sus tres credenciales, sin mostrarlas', () => {
+      let message = '';
+      try {
+        validateEnv({
+          ...base,
+          STORAGE_PROVIDER: 'cloudinary',
+          CLOUDINARY_API_SECRET: 'secreto-que-no-se-muestra',
+        });
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toMatch(/CLOUDINARY_CLOUD_NAME/);
+      expect(message).toMatch(/CLOUDINARY_API_KEY/);
+      expect(message).not.toMatch(/CLOUDINARY_API_SECRET|secreto-que-no-se-muestra/);
+      expect(
+        validateEnv({
+          ...base,
+          STORAGE_PROVIDER: 'cloudinary',
+          CLOUDINARY_CLOUD_NAME: 'nube',
+          CLOUDINARY_API_KEY: '123',
+          CLOUDINARY_API_SECRET: 'secreto-largo-de-prueba',
+        }).STORAGE_PROVIDER,
+      ).toBe('cloudinary');
+    });
+
+    it('el proveedor simulado exige su secreto de webhooks', () => {
+      expect(() => validateEnv({ ...base, IDENTITY_PROVIDER: 'fake' })).toThrow(
+        /FAKE_IDENTITY_WEBHOOK_SECRET/,
+      );
+    });
   });
 });

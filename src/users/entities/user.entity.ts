@@ -12,6 +12,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Neighborhood } from '../../locations/entities/neighborhood.entity';
+import { StoredFile } from '../../uploads/entities/stored-file.entity';
 import { AccountStatus, UserRole, VerificationStatus } from '../user.enums';
 
 /**
@@ -22,6 +23,7 @@ import { AccountStatus, UserRole, VerificationStatus } from '../user.enums';
 // Único entre cuentas no borradas: índice parcial creado en la migración.
 @Index('uq_users_email', { synchronize: false })
 @Index(['neighborhoodId'])
+@Index(['avatarFileId'])
 // Parcial (solo cuentas en gracia): creado en la migración.
 @Index('ix_users_deletion_scheduled_for', { synchronize: false })
 @Check('ck_users_failed_login_attempts', 'failed_login_attempts >= 0')
@@ -86,6 +88,14 @@ export class User {
   @ManyToOne(() => Neighborhood, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'neighborhood_id' })
   neighborhood?: Relation<Neighborhood>;
+
+  /** Foto de perfil (paso 2 del registro, ADR 0006). Requisito para aprobar la identidad. */
+  @Column({ type: 'uuid', nullable: true })
+  avatarFileId: string | null;
+
+  @ManyToOne(() => StoredFile, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'avatar_file_id' })
+  avatarFile?: Relation<StoredFile>;
 
   @Column({ type: 'timestamptz', nullable: true })
   emailVerifiedAt: Date | null;

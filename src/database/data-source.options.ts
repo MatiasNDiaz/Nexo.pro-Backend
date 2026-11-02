@@ -6,6 +6,9 @@ import { UserMfaSettings } from '../auth/entities/user-mfa-settings.entity';
 import { ProfessionalProfession } from '../professionals/entities/professional-profession.entity';
 import { ProfessionalProfile } from '../professionals/entities/professional-profile.entity';
 import { ProfessionalServiceArea } from '../professionals/entities/professional-service-area.entity';
+import { IdentityProviderEvent } from '../identity-verification/entities/identity-provider-event.entity';
+import { IdentityVerification } from '../identity-verification/entities/identity-verification.entity';
+import { StoredFile } from '../uploads/entities/stored-file.entity';
 import { User } from '../users/entities/user.entity';
 import { Locality } from '../locations/entities/locality.entity';
 import { Neighborhood } from '../locations/entities/neighborhood.entity';
@@ -30,6 +33,9 @@ export const ENTITIES = [
   ProfessionalProfile,
   ProfessionalProfession,
   ProfessionalServiceArea,
+  StoredFile,
+  IdentityVerification,
+  IdentityProviderEvent,
 ];
 
 export interface ConnectionSettings {

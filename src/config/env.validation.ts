@@ -17,6 +17,12 @@ import {
 export const NODE_ENVS = ['development', 'test', 'production'] as const;
 export type NodeEnv = (typeof NODE_ENVS)[number];
 
+export const STORAGE_PROVIDERS = ['local', 'cloudinary'] as const;
+export type StorageProviderName = (typeof STORAGE_PROVIDERS)[number];
+
+export const IDENTITY_PROVIDERS = ['manual', 'fake'] as const;
+export type IdentityProviderName = (typeof IDENTITY_PROVIDERS)[number];
+
 export const MAIL_PROVIDERS = ['console', 'memory'] as const;
 export type MailProviderName = (typeof MAIL_PROVIDERS)[number];
 
@@ -206,6 +212,52 @@ export class EnvironmentVariables {
   @MinLength(3)
   MAIL_FROM = 'Nexo PRO <no-reply@localhost>';
 
+  // ---- Archivos (ADR 0018) ----
+
+  /** `local` (desarrollo y tests: disco) o `cloudinary`. En producción, solo cloudinary. */
+  @IsIn(STORAGE_PROVIDERS)
+  STORAGE_PROVIDER: StorageProviderName = 'local';
+
+  /** Carpeta del adaptador local (no se versiona). */
+  @IsString()
+  @MinLength(1)
+  STORAGE_LOCAL_DIR = '.uploads';
+
+  @IsOptional()
+  @Matches(/^[a-z0-9_-]+$/i)
+  CLOUDINARY_CLOUD_NAME?: string;
+
+  @IsOptional()
+  @Matches(/^\d+$/)
+  CLOUDINARY_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  CLOUDINARY_API_SECRET?: string;
+
+  /** Carpeta raíz en Cloudinary (separa ambientes en la misma cuenta). */
+  @Matches(/^[a-z0-9_-]+$/)
+  CLOUDINARY_FOLDER = 'nexo-dev';
+
+  // ---- Verificación de identidad (ADR 0003) ----
+
+  /** `manual` (el admin decide) o `fake` (solo desarrollo y tests: simula un KYC con webhooks). */
+  @IsIn(IDENTITY_PROVIDERS)
+  IDENTITY_PROVIDER: IdentityProviderName = 'manual';
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  IDENTITY_MAX_ATTEMPTS = 3;
+
+  /** Solo con IDENTITY_PROVIDER=fake: secreto HMAC de sus webhooks simulados (≥ 32). */
+  @IsOptional()
+  @IsString()
+  @MinLength(32)
+  FAKE_IDENTITY_WEBHOOK_SECRET?: string;
+
   /** Días que una cuenta dada de baja queda restaurable antes de anonimizarse (ADR 0016). */
   @Transform(toInt)
   @IsInt()
@@ -221,10 +273,35 @@ export class EnvironmentVariables {
   MAX_SERVICE_AREAS = 20;
 }
 
+/** Variables que pasan a ser obligatorias según el proveedor elegido. */
+function providerRules(env: EnvironmentVariables): string[] {
+  const problems: string[] = [];
+  if (env.STORAGE_PROVIDER === 'cloudinary') {
+    for (const name of [
+      'CLOUDINARY_CLOUD_NAME',
+      'CLOUDINARY_API_KEY',
+      'CLOUDINARY_API_SECRET',
+    ] as const) {
+      if (!env[name]) problems.push(`${name} (obligatoria con STORAGE_PROVIDER=cloudinary)`);
+    }
+  }
+  if (env.IDENTITY_PROVIDER === 'fake' && !env.FAKE_IDENTITY_WEBHOOK_SECRET) {
+    problems.push('FAKE_IDENTITY_WEBHOOK_SECRET (obligatoria con IDENTITY_PROVIDER=fake)');
+  }
+  return problems;
+}
+
 /** Reglas que dependen del ambiente y no se expresan con un decorador por campo. */
 function productionRules(env: EnvironmentVariables): string[] {
   if (env.NODE_ENV !== 'production') return [];
   const problems: string[] = [];
+  // El disco de Railway es efímero: los archivos se perderían en cada deploy.
+  if (env.STORAGE_PROVIDER === 'local') {
+    problems.push('STORAGE_PROVIDER (en producción los archivos van a Cloudinary)');
+  }
+  if (env.IDENTITY_PROVIDER === 'fake') {
+    problems.push('IDENTITY_PROVIDER (el proveedor simulado está prohibido en producción)');
+  }
   if (env.SWAGGER_ENABLED) problems.push('SWAGGER_ENABLED (no se permite en producción)');
   if (env.FRONTEND_ORIGINS.some((origin) => !origin.startsWith('https://'))) {
     problems.push('FRONTEND_ORIGINS (en producción todos los orígenes deben ser https)');
@@ -247,7 +324,10 @@ function productionRules(env: EnvironmentVariables): string[] {
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
   const env = plainToInstance(EnvironmentVariables, config, { exposeDefaultValues: true });
   const errors = validateSync(env, { skipMissingProperties: false, whitelist: false });
-  const problems = [...errors.map(describe), ...(errors.length ? [] : productionRules(env))];
+  const problems = [
+    ...errors.map(describe),
+    ...(errors.length ? [] : [...providerRules(env), ...productionRules(env)]),
+  ];
   if (problems.length > 0) {
     throw new Error(
       `Configuración inválida. Revisá estas variables de entorno: ${problems.join('; ')}`,
