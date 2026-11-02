@@ -1,11 +1,13 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { ApiOkResponse, ApiServiceUnavailableResponse, ApiTags } from '@nestjs/swagger';
 import { DataSource } from 'typeorm';
+import { Public } from '../common/decorators';
 
 const READY_TIMEOUT_MS = 2000;
 
 /** Health checks sin datos internos: no exponen versión, entorno ni detalles de la base. */
 @ApiTags('health')
+@Public()
 @Controller({ path: 'health', version: '1' })
 export class HealthController {
   constructor(private readonly dataSource: DataSource) {}

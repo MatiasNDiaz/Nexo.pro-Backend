@@ -3,10 +3,37 @@ import { validateEnv } from './env.validation';
 const base = {
   NODE_ENV: 'development',
   FRONTEND_ORIGINS: 'http://localhost:3000',
+  FRONTEND_URL: 'http://localhost:3000',
   DATABASE_URL: 'postgres://app:clave@localhost:5432/nexo_dev',
+  JWT_ACCESS_SECRET: 'j'.repeat(64),
+  CSRF_SECRET: 'c'.repeat(32),
+  DATA_ENCRYPTION_KEY: 'a'.repeat(64),
+  DATA_HMAC_KEY: 'h'.repeat(32),
 };
 
 describe('validateEnv', () => {
+  it('aplica las duraciones de sesión de la ADR 0008 y deja apagado el reset autoservicio', () => {
+    const env = validateEnv(base);
+    expect(env.ACCESS_TOKEN_TTL_SEC).toBe(600);
+    expect(env.ADMIN_ACCESS_TOKEN_TTL_SEC).toBe(300);
+    expect(env.REFRESH_IDLE_TTL_SEC).toBe(14 * 24 * 3600);
+    expect(env.ADMIN_REFRESH_IDLE_TTL_SEC).toBe(12 * 3600);
+    expect(env.REFRESH_ABSOLUTE_TTL_SEC).toBe(30 * 24 * 3600);
+    expect(env.ADMIN_REFRESH_ABSOLUTE_TTL_SEC).toBe(7 * 24 * 3600);
+    expect(env.PASSWORD_SELF_RESET_ENABLED).toBe(false);
+    expect(env.MAX_SERVICE_AREAS).toBe(20);
+  });
+
+  it.each([
+    ['JWT_ACCESS_SECRET', 'corto'],
+    ['CSRF_SECRET', 'corto'],
+    ['DATA_ENCRYPTION_KEY', 'no-es-hex'],
+    ['DATA_HMAC_KEY', 'corto'],
+  ])('rechaza un %s débil sin mostrarlo', (name, value) => {
+    expect(() => validateEnv({ ...base, [name]: value })).toThrow(new RegExp(name));
+    expect(() => validateEnv({ ...base, [name]: value })).not.toThrow(new RegExp(value));
+  });
+
   it('exige DATABASE_URL de PostgreSQL sin mostrar la contraseña de la URL', () => {
     let message = '';
     try {
@@ -80,10 +107,33 @@ describe('validateEnv', () => {
   });
 
   describe('en producción', () => {
-    const prod = { ...base, NODE_ENV: 'production', FRONTEND_ORIGINS: 'https://app.example.com' };
+    const prod = {
+      ...base,
+      NODE_ENV: 'production',
+      FRONTEND_ORIGINS: 'https://app.example.com',
+      FRONTEND_URL: 'https://app.example.com',
+      COOKIE_SECURE: 'true',
+    };
 
-    it('acepta una configuración segura', () => {
-      expect(() => validateEnv(prod)).not.toThrow();
+    it('exige un proveedor real de email: consola y memoria filtrarían o perderían los enlaces', () => {
+      // Hoy no hay proveedor real (pendiente): la API todavía no puede arrancar en producción.
+      for (const provider of ['console', 'memory']) {
+        let message = '';
+        try {
+          validateEnv({ ...prod, MAIL_PROVIDER: provider });
+        } catch (error) {
+          message = (error as Error).message;
+        }
+        expect(message).toMatch(/MAIL_PROVIDER/);
+        expect(message).not.toMatch(/COOKIE_SECURE|FRONTEND_URL|SWAGGER/);
+      }
+    });
+
+    it('exige cookies Secure y FRONTEND_URL https', () => {
+      expect(() => validateEnv({ ...prod, COOKIE_SECURE: 'false' })).toThrow(/COOKIE_SECURE/);
+      expect(() => validateEnv({ ...prod, FRONTEND_URL: 'http://app.example.com' })).toThrow(
+        /FRONTEND_URL/,
+      );
     });
 
     it('prohíbe Swagger', () => {

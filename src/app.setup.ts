@@ -5,7 +5,8 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 import { REQUEST_ID_HEADER } from './common/logging/logger.options';
-import { AppConfig, appConfig } from './config/app.config';
+import { type AppConfig, appConfig } from './config/app.config';
+import { type AuthConfig, authConfig } from './config/auth.config';
 
 /** Opciones con las que se crea la app; las comparten `main.ts` y los tests e2e. */
 export const APP_CREATE_OPTIONS = { bodyParser: false, bufferLogs: true } as const;
@@ -39,12 +40,18 @@ export function configureApp(app: NestExpressApplication): AppConfig {
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 
   if (config.swaggerEnabled && !config.isProduction) {
+    const auth = app.get<AuthConfig>(authConfig.KEY);
     const document = SwaggerModule.createDocument(
       app,
       new DocumentBuilder()
         .setTitle('Nexo PRO API')
-        .setDescription('API REST de Nexo PRO / Repara Ya')
+        .setDescription(
+          'API REST de Nexo PRO / Repara Ya. Autenticación por cookies HttpOnly: iniciá sesión con ' +
+            '/auth/login y mandá el `csrfToken` recibido en el header `X-CSRF-Token` (más ' +
+            '`X-Requested-With: XMLHttpRequest`) en todo POST/PATCH/PUT/DELETE. Ver docs/auth.md.',
+        )
         .setVersion('1')
+        .addCookieAuth(auth.cookies.names.access)
         .build(),
     );
     SwaggerModule.setup(`${config.apiPrefix}/docs`, app, document);

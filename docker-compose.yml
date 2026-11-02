@@ -26,6 +26,9 @@ services:
     build: .
     env_file:
       - .env.development
+      # Secretos locales (JWT, CSRF, claves). Las URLs de base de abajo tienen prioridad.
+      - path: .env.development.local
+        required: false
     environment:
       NODE_ENV: development
       DATABASE_URL: postgres://nexo_app:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-nexo_dev}

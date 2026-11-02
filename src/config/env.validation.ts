@@ -9,12 +9,16 @@ import {
   Matches,
   Max,
   Min,
+  MinLength,
   validateSync,
   ValidationError,
 } from 'class-validator';
 
 export const NODE_ENVS = ['development', 'test', 'production'] as const;
 export type NodeEnv = (typeof NODE_ENVS)[number];
+
+export const MAIL_PROVIDERS = ['console', 'memory'] as const;
+export type MailProviderName = (typeof MAIL_PROVIDERS)[number];
 
 export const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
@@ -110,6 +114,104 @@ export class EnvironmentVariables {
   @Min(1)
   @Max(50)
   DB_POOL_MAX = 10;
+
+  // ---- Autenticación (etapa 5, ADR 0008) ----
+
+  /** URL base del frontend para los enlaces de los emails. Nunca se arma con el header Host. */
+  @Matches(ORIGIN_PATTERN)
+  FRONTEND_URL: string;
+
+  /** Secreto HS256 del access token (≥ 64 caracteres aleatorios). */
+  @IsString()
+  @MinLength(64)
+  JWT_ACCESS_SECRET: string;
+
+  /** Secreto anterior, solo durante una rotación: se acepta para verificar, nunca para firmar. */
+  @IsOptional()
+  @IsString()
+  @MinLength(64)
+  JWT_ACCESS_SECRET_PREVIOUS?: string;
+
+  @IsString()
+  @Matches(/^[a-z0-9-]+$/)
+  JWT_ISSUER = 'nexo-api';
+
+  @IsString()
+  @Matches(/^[a-z0-9-]+$/)
+  JWT_AUDIENCE = 'nexo-web';
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(60)
+  ACCESS_TOKEN_TTL_SEC = 600;
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(60)
+  ADMIN_ACCESS_TOKEN_TTL_SEC = 300;
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(300)
+  REFRESH_IDLE_TTL_SEC = 14 * 24 * 3600;
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(300)
+  ADMIN_REFRESH_IDLE_TTL_SEC = 12 * 3600;
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(300)
+  REFRESH_ABSOLUTE_TTL_SEC = 30 * 24 * 3600;
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(300)
+  ADMIN_REFRESH_ABSOLUTE_TTL_SEC = 7 * 24 * 3600;
+
+  /** Cookies con `Secure` y prefijos `__Host-`/`__Secure-`. Obligatorio en producción. */
+  @Transform(toBoolean)
+  @IsBoolean()
+  COOKIE_SECURE = false;
+
+  /** Secreto HMAC del token CSRF (≥ 32 caracteres aleatorios). */
+  @IsString()
+  @MinLength(32)
+  CSRF_SECRET: string;
+
+  /** Clave AES-256-GCM para datos cifrados (p. ej. el secreto TOTP): 64 caracteres hex. */
+  @Matches(/^[0-9a-fA-F]{64}$/)
+  DATA_ENCRYPTION_KEY: string;
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(1)
+  DATA_ENCRYPTION_KEY_VERSION = 1;
+
+  /** Clave HMAC para seudonimizar datos (p. ej. IP de las sesiones). ≥ 32 caracteres. */
+  @IsString()
+  @MinLength(32)
+  DATA_HMAC_KEY: string;
+
+  /** "Olvidé mi contraseña" autoservicio. Apagado por decisión del fundador (ADR 0002). */
+  @Transform(toBoolean)
+  @IsBoolean()
+  PASSWORD_SELF_RESET_ENABLED = false;
+
+  @IsIn(MAIL_PROVIDERS)
+  MAIL_PROVIDER: MailProviderName = 'console';
+
+  @IsString()
+  @MinLength(3)
+  MAIL_FROM = 'Nexo PRO <no-reply@localhost>';
+
+  /** Máximo de zonas (barrios o localidades completas) por profesional (ADR 0010). */
+  @Transform(toInt)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  MAX_SERVICE_AREAS = 20;
 }
 
 /** Reglas que dependen del ambiente y no se expresan con un decorador por campo. */
@@ -119,6 +221,14 @@ function productionRules(env: EnvironmentVariables): string[] {
   if (env.SWAGGER_ENABLED) problems.push('SWAGGER_ENABLED (no se permite en producción)');
   if (env.FRONTEND_ORIGINS.some((origin) => !origin.startsWith('https://'))) {
     problems.push('FRONTEND_ORIGINS (en producción todos los orígenes deben ser https)');
+  }
+  if (!env.FRONTEND_URL.startsWith('https://')) {
+    problems.push('FRONTEND_URL (en producción debe ser https)');
+  }
+  if (!env.COOKIE_SECURE) problems.push('COOKIE_SECURE (en producción debe ser true)');
+  // Los adaptadores de desarrollo imprimirían enlaces con tokens en la consola o los perderían.
+  if (env.MAIL_PROVIDER === 'console' || env.MAIL_PROVIDER === 'memory') {
+    problems.push('MAIL_PROVIDER (en producción hace falta un proveedor real de email)');
   }
   return problems;
 }

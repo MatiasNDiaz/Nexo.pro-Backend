@@ -38,7 +38,6 @@ describe('Catálogos maestros (integración)', () => {
     await expect(seedCatalogs(dataSource)).resolves.toEqual({
       provinces: 0,
       localities: 0,
-      neighborhoods: 0,
       professions: 0,
       plans: 0,
     });
@@ -72,12 +71,16 @@ describe('Catálogos maestros (integración)', () => {
     }
   });
 
-  it('carga las ubicaciones de ejemplo de Córdoba', async () => {
+  it('carga la localidad de Córdoba y ningún barrio (los crean los usuarios, ADR 0010)', async () => {
     const province = await dataSource.getRepository(Province).findOneByOrFail({ name: 'Córdoba' });
     const locality = await dataSource
       .getRepository(Locality)
       .findOneByOrFail({ provinceId: province.id });
     expect(locality).toMatchObject({ name: 'Córdoba', lat: null, lng: null });
+    const [{ count }] = await dataSource.query<Array<{ count: string }>>(
+      `SELECT count(*) FROM neighborhoods`,
+    );
+    expect(count).toBe('0');
   });
 
   describe('constraints de la base', () => {

@@ -1,17 +1,30 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { AuditModule } from './audit/audit.module';
+import { AuthModule } from './auth/auth.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { AccountStateGuard } from './common/guards/account-state.guard';
+import { CsrfGuard } from './common/guards/csrf.guard';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { OriginGuard } from './common/guards/origin.guard';
+import { RolesGuard } from './common/guards/roles.guard';
 import { buildLoggerOptions } from './common/logging/logger.options';
 import { createValidationPipe } from './common/pipes/create-validation-pipe';
-import { AppConfig, appConfig } from './config/app.config';
+import { type AppConfig, appConfig } from './config/app.config';
+import { authConfig } from './config/auth.config';
 import { databaseConfig } from './config/database.config';
 import { validateEnv } from './config/env.validation';
+import { mailConfig } from './config/mail.config';
+import { securityConfig } from './config/security.config';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
+import { MailModule } from './integrations/mail/mail.module';
+import { LocationsModule } from './locations/locations.module';
+import { ProfessionsModule } from './professions/professions.module';
 
 const nodeEnv = process.env.NODE_ENV ?? 'development';
 
@@ -22,10 +35,10 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
       cache: true,
       // `.local` primero: ahí van los secretos de cada desarrollador (no se versiona).
       envFilePath: [`.env.${nodeEnv}.local`, `.env.${nodeEnv}`],
-      load: [appConfig, databaseConfig],
+      load: [appConfig, databaseConfig, authConfig, securityConfig, mailConfig],
       // Falla al iniciar si el entorno es inválido. Devuelve las variables crudas para que
       // @nestjs/config las copie a process.env (solo copia strings/números/booleanos, no listas);
-      // la versión tipada la arman `appConfig` y `databaseConfig` con la misma función.
+      // la versión tipada la arman los namespaces de src/config con la misma función.
       validate: (raw) => {
         validateEnv(raw);
         return raw;
@@ -41,14 +54,24 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
         { ttl: config.throttle.ttlMs, limit: config.throttle.limit },
       ],
     }),
+    EventEmitterModule.forRoot(),
     DatabaseModule,
     AuditModule,
+    MailModule,
     HealthModule,
+    LocationsModule,
+    ProfessionsModule,
+    AuthModule,
   ],
   providers: [
-    // Guards globales en el orden del plan (§9.8). Las etapas 5 y 6 agregan origin, JWT, CSRF,
-    // estado de cuenta, roles y suscripción después del throttler.
+    // Guards globales, en este orden (plan §9.8). Denegación por defecto: solo `@Public()` pasa
+    // sin sesión. La etapa 9 agrega el de suscripción/plan al final.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: OriginGuard },
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: CsrfGuard },
+    { provide: APP_GUARD, useClass: AccountStateGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_PIPE, useFactory: createValidationPipe },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
   ],
