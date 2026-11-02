@@ -26,7 +26,7 @@ Fuente: plan §4.2 y §4.3 más el análisis de la etapa 1. Se actualiza al cerr
 | C-29        | Sanción solo al perfil profesional                                      | Tipo de sanción `PROFILE_HIDDEN`                                          | Etapa 11      |
 | C-32        | Alcance del acceso del admin a chats                                    | Solo con reporte, auditado (legal)                                        | Etapa 11      |
 
-Resueltas: P-14 (pesos de archivos, ADR 0018), C-01 (ADR 0002), C-02 (ADR 0003, provisoria), C-05 (ADR 0009), C-15 (puerto 3001), C-16 (ADR 0013, **pendiente de revisión legal**), C-23 (ADR 0017), C-25 (ADR 0014), C-26 (mail de consola), C-31 (ADR 0005), C-33 (ADR 0006 y 0010), C-35 (ADR 0007), C-36 (ADR 0016). C-17, C-20, C-21 y C-22 son técnicas y se aplican como propone el plan.
+Resueltas: P-14 (pesos de archivos, ADR 0018), cambio de foto con identidad aprobada (ADR 0019), proveedor de pagos (**Mercado Pago**, confirmado el 02/11/2026 para la etapa 9), C-01 (ADR 0002), C-02 (ADR 0003, provisoria), C-05 (ADR 0009), C-15 (puerto 3001), C-16 (ADR 0013, **pendiente de revisión legal**), C-23 (ADR 0017), C-25 (ADR 0014), C-26 (mail de consola), C-31 (ADR 0005), C-33 (ADR 0006 y 0010), C-35 (ADR 0007), C-36 (ADR 0016). C-17, C-20, C-21 y C-22 son técnicas y se aplican como propone el plan.
 
 C-34 (admin único con MFA): mitigado con 10 códigos de recuperación de un solo uso. Falta un procedimiento para reenrolar el TOTP si se pierden dispositivo y códigos (hoy requiere intervención directa en la base).
 
@@ -51,7 +51,6 @@ C-34 (admin único con MFA): mitigado con 10 códigos de recuperación de un sol
 | —           | Rechazo de contraseñas filtradas (HIBP)                  | No implementado (llamada externa, ADR 0011)                                                             | Producción               |
 | —           | Cambio de email (confirmación al nuevo, aviso al viejo)  | No implementado                                                                                         | Etapa 7.2                |
 | —           | Credenciales de Cloudinary (cuenta del fundador)         | Adaptador local en disco. **Sin Cloudinary la API no arranca en producción** (la validación lo exige)   | Producción               |
-| —           | Cambiar la foto después de verificar la identidad        | Se permite y no reabre la verificación. ¿Debería volver a revisión o quedar bloqueada?                  | Etapa 7.2                |
 | —           | Proveedor real de verificación de identidad (ADR 0003)   | Manual: el admin decide (videollamada). Elegir proveedor y revisión legal del consentimiento biométrico | Legal / etapa 13         |
 | —           | Reintento de borrados fallidos en Cloudinary             | Se registra en el log; el archivo queda marcado DELETED en la base. Job de reintento                    | Etapa 12                 |
 | —           | Moderación del contenido de las fotos                    | Sin moderación automática; el admin ve la foto al verificar la identidad. Reportes en la etapa 11       | Etapa 11                 |
