@@ -121,7 +121,9 @@ Eventos auditados hoy: `USER_REGISTERED`, `ACCOUNT_LOCKED`, `REFRESH_TOKEN_REUSE
 `ADMIN_LOGIN_RECOVERY_CODE`, `ADMIN_PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET_COMPLETED`,
 `PASSWORD_CHANGED`, `ADMIN_CREATED`, `ACCOUNT_SUSPENDED`, `ACCOUNT_BANNED`, `ACCOUNT_RESTORED`,
 `ROLE_CHANGED` (con rol de origen y destino: reemplaza a la tabla `role_changes` del plan),
-`SESSIONS_REVOKED`, `ACCOUNT_DELETED`.
+`SESSIONS_REVOKED`, `ACCOUNT_DELETION_SCHEDULED`, `ACCOUNT_ANONYMIZED`.
+
+`users.deletion_scheduled_for`: fecha en que se anonimiza una cuenta dada de baja (30 días de gracia, ADR 0016).
 
 `users.status_reason` guarda el motivo de una suspensión o baneo para mostrárselo al usuario
 (ADR 0007); en la etapa 11 lo complementan las sanciones. Las cuentas dadas de baja pueden quedar sin

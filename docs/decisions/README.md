@@ -20,5 +20,8 @@ Formato: contexto, decisión, consecuencias, fecha. Para cambiar una decisión s
 | [0013](0013-baja-de-cuenta.md)                    | Baja con anonimización inmediata (sujeta a revisión legal)                          |
 | [0014](0014-cuenta-comprometida.md)               | Cuenta comprometida: se recupera la misma cuenta                                    |
 | [0015](0015-login-con-google.md)                  | Login con Google para clientes y profesionales (etapa 7B)                           |
+| [0016](0016-periodo-de-gracia-en-la-baja.md)      | Baja con 30 días de gracia (restaurable) antes de anonimizar                        |
+| [0017](0017-prueba-gratuita.md)                   | Prueba de 30 días desde el registro, con contador y recordatorios                   |
+| [0018](0018-archivos-en-cloudinary.md)            | Archivos en Cloudinary; pesos máximos por plan                                      |
 
 Las decisiones todavía abiertas están en [pendientes.md](pendientes.md).

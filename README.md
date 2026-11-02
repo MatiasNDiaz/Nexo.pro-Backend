@@ -49,6 +49,7 @@ NestJS 12 · TypeORM 1.x · PostgreSQL 17 · Node 26. La consume un frontend Nex
 | `npm run migration:create -- src/database/migrations/NombreDelCambio` | Crea una migración vacía (después registrala en `migrations/index.ts`) |
 | `npm run seed:catalogs`                                               | Ubicaciones, oficios y planes (idempotente)                            |
 | `npm run admin:create -- --email …`                                   | Crea el único admin con segundo factor TOTP                            |
+| `npm run accounts:purge`                                              | Anonimiza las cuentas dadas de baja con la gracia vencida (diario)     |
 
 ## Documentación
 

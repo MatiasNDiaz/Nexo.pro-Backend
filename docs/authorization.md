@@ -34,18 +34,18 @@ exige cuenta `ACTIVE`.
 | `PENDING_VERIFICATION` | Ver su cuenta y sesiones, verificar email, cambiar contraseña, cerrar sesión. Verificar identidad (etapa 7). No opera |
 | `ACTIVE`               | Todo lo que su rol permita                                                                                            |
 | `SUSPENDED` / `BANNED` | Ver su cuenta (con el motivo en `statusReason`), sus sesiones y cerrar sesión. Apelar (etapa 11) (ADR 0007)           |
-| `DEACTIVATED`          | Nada: cuenta dada de baja y anonimizada (ADR 0013)                                                                    |
+| `DEACTIVATED`          | Nada: cuenta dada de baja. Restaurable por el admin durante 30 días; después se anonimiza (ADR 0013 y 0016)           |
 
 ### Transiciones (las hace el admin, con motivo y auditoría)
 
-| Acción            | Desde                                         | Hacia                                                                 | Revoca sesiones |
-| ----------------- | --------------------------------------------- | --------------------------------------------------------------------- | --------------- |
-| `suspend`         | `ACTIVE`, `PENDING_VERIFICATION`              | `SUSPENDED`                                                           | Sí              |
-| `ban`             | `ACTIVE`, `PENDING_VERIFICATION`, `SUSPENDED` | `BANNED`                                                              | Sí              |
-| `restore`         | `SUSPENDED`, `BANNED`                         | `ACTIVE` si la identidad está aprobada; si no, `PENDING_VERIFICATION` | No              |
-| `change-role`     | Cliente ↔ profesional (nunca ADMIN)           | El otro rol; el perfil anterior queda inactivo                        | Sí              |
-| `revoke-sessions` | Cualquiera                                    | Sin cambio de estado (cuenta comprometida, ADR 0014)                  | Sí              |
-| `DELETE` (baja)   | Cualquiera salvo ADMIN                        | `DEACTIVATED` + anonimización                                         | Sí              |
+| Acción            | Desde                                                       | Hacia                                                                                        | Revoca sesiones |
+| ----------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------- |
+| `suspend`         | `ACTIVE`, `PENDING_VERIFICATION`                            | `SUSPENDED`                                                                                  | Sí              |
+| `ban`             | `ACTIVE`, `PENDING_VERIFICATION`, `SUSPENDED`               | `BANNED`                                                                                     | Sí              |
+| `restore`         | `SUSPENDED`, `BANNED`, o `DEACTIVATED` en período de gracia | `ACTIVE` si la identidad está aprobada; si no, `PENDING_VERIFICATION`                        | No              |
+| `change-role`     | Cliente ↔ profesional (nunca ADMIN)                         | El otro rol; el perfil anterior queda inactivo                                               | Sí              |
+| `revoke-sessions` | Cualquiera                                                  | Sin cambio de estado (cuenta comprometida, ADR 0014)                                         | Sí              |
+| `DELETE` (baja)   | Cualquiera salvo ADMIN                                      | `DEACTIVATED` por 30 días (restaurable) y después anonimización con `npm run accounts:purge` | Sí              |
 
 Transición inválida → 409 `INVALID_STATE_TRANSITION`. Ninguna se aplica a una cuenta ADMIN
 (409 `CANNOT_MODIFY_ADMIN`). Las cuentas activas también pueden darse de baja solas (`DELETE /users/me`,

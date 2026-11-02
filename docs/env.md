@@ -58,6 +58,7 @@ Secretos: generalos con `node -e "console.log(require('crypto').randomBytes(64).
 | `MAIL_PROVIDER`                        | No          | `console`                       | `console` (desarrollo) o `memory` (tests). **En producción ninguno de los dos es válido**: hace falta un proveedor real |
 | `MAIL_FROM`                            | No          | `Nexo PRO <no-reply@localhost>` | Remitente                                                                                                               |
 | `MAX_SERVICE_AREAS`                    | No          | `20`                            | Zonas de trabajo por profesional (ADR 0010)                                                                             |
+| `ACCOUNT_DELETION_GRACE_DAYS`          | No          | `30`                            | Días que una cuenta dada de baja queda restaurable antes de anonimizarse (ADR 0016)                                     |
 
 En `.env.test` estas variables tienen valores fijos de prueba (públicos en el repo: no sirven para
 otro ambiente) y `TRUST_PROXY=1`, para que cada cliente de los e2e simule su propia IP.
