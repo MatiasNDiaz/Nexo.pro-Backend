@@ -25,8 +25,12 @@ Los tests corren con `node --experimental-vm-modules` porque los paquetes de Nes
   del último enlace enviado a una dirección.
 - `createAdmin()` crea un admin con TOTP directo en la base (en producción, `npm run admin:create`).
 
-Cobertura del plan §9.10: casos 1 a 14 en `auth.e2e-spec.ts` y `admin-auth.e2e-spec.ts`. El caso 15
-(cambio de rol o suspensión por el admin revoca sesiones) necesita los endpoints de la etapa 6.
+Cobertura del plan §9.10: casos 1 a 14 en `auth.e2e-spec.ts` y `admin-auth.e2e-spec.ts`; el caso 15
+(cambio de rol o suspensión revoca sesiones) en `account-lifecycle.e2e-spec.ts`.
+
+`route-security.e2e-spec.ts` recorre todas las rutas registradas: sin sesión → 401 salvo la lista
+`PUBLIC_ROUTES`; con un cliente activo, toda ruta `/admin` → 403. **Si agregás una ruta pública, sumala
+a esa lista a propósito.**
 
 ## Reglas
 

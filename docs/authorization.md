@@ -33,8 +33,23 @@ exige cuenta `ACTIVE`.
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `PENDING_VERIFICATION` | Ver su cuenta y sesiones, verificar email, cambiar contraseña, cerrar sesión. Verificar identidad (etapa 7). No opera |
 | `ACTIVE`               | Todo lo que su rol permita                                                                                            |
-| `SUSPENDED` / `BANNED` | Ver su cuenta, sus sesiones y cerrar sesión. Apelar (etapa 11) (ADR 0007)                                             |
-| `DEACTIVATED`          | Nada: no inicia sesión                                                                                                |
+| `SUSPENDED` / `BANNED` | Ver su cuenta (con el motivo en `statusReason`), sus sesiones y cerrar sesión. Apelar (etapa 11) (ADR 0007)           |
+| `DEACTIVATED`          | Nada: cuenta dada de baja y anonimizada (ADR 0013)                                                                    |
+
+### Transiciones (las hace el admin, con motivo y auditoría)
+
+| Acción            | Desde                                         | Hacia                                                                 | Revoca sesiones |
+| ----------------- | --------------------------------------------- | --------------------------------------------------------------------- | --------------- |
+| `suspend`         | `ACTIVE`, `PENDING_VERIFICATION`              | `SUSPENDED`                                                           | Sí              |
+| `ban`             | `ACTIVE`, `PENDING_VERIFICATION`, `SUSPENDED` | `BANNED`                                                              | Sí              |
+| `restore`         | `SUSPENDED`, `BANNED`                         | `ACTIVE` si la identidad está aprobada; si no, `PENDING_VERIFICATION` | No              |
+| `change-role`     | Cliente ↔ profesional (nunca ADMIN)           | El otro rol; el perfil anterior queda inactivo                        | Sí              |
+| `revoke-sessions` | Cualquiera                                    | Sin cambio de estado (cuenta comprometida, ADR 0014)                  | Sí              |
+| `DELETE` (baja)   | Cualquiera salvo ADMIN                        | `DEACTIVATED` + anonimización                                         | Sí              |
+
+Transición inválida → 409 `INVALID_STATE_TRANSITION`. Ninguna se aplica a una cuenta ADMIN
+(409 `CANNOT_MODIFY_ADMIN`). Las cuentas activas también pueden darse de baja solas (`DELETE /users/me`,
+con contraseña).
 
 ## Ownership (recursos propios)
 
@@ -49,7 +64,11 @@ el recurso no es suyo, para no confirmar que existe. Ejemplo implementado: `DELE
 | `GET /locations/provinces`, `/localities`, `/neighborhoods` (solo aprobados), `GET /professions`                                                | Público                                                    |
 | `POST /auth/register`, `/login`, `/mfa/verify`, `/refresh`, `/logout`, `/email/verify`, `/password/forgot`, `/password/reset`, `GET /auth/csrf` | Público (refresh, logout y csrf usan la cookie de refresh) |
 | `GET /auth/me`, `GET /auth/sessions`, `DELETE /auth/sessions/:id`, `POST /auth/logout-all`                                                      | Con sesión, cualquier estado salvo `DEACTIVATED`           |
-| `POST /auth/email/resend`, `POST /auth/password/change`                                                                                         | Con sesión, `PENDING_VERIFICATION` o `ACTIVE`              |
-| `POST /admin/users/:id/password-reset`                                                                                                          | `ADMIN` activo                                             |
+| `POST /auth/email/resend`, `POST /auth/password/change`, `DELETE /users/me`                                                                     | Con sesión, `PENDING_VERIFICATION` o `ACTIVE`              |
+| `POST /admin/users/:id/password-reset`, `/suspend`, `/ban`, `/restore`, `/change-role`, `/revoke-sessions`, `DELETE /admin/users/:id`           | `ADMIN` activo                                             |
+
+**Garantía automática**: `test/route-security.e2e-spec.ts` recorre todas las rutas registradas y exige
+401 sin sesión en todas salvo una lista explícita de rutas públicas, y 403 en todas las rutas
+`/admin` para un cliente activo. Una ruta nueva marcada `@Public()` por error hace fallar el test.
 
 La matriz completa por rol, estado, propiedad y plan está en el plan §10; se implementa por etapa.

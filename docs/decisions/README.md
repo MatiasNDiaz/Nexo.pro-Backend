@@ -16,5 +16,9 @@ Formato: contexto, decisión, consecuencias, fecha. Para cambiar una decisión s
 | [0009](0009-limites-plan-premium.md)              | Premium: 5 imágenes y 2 videos (configurable)                                       |
 | [0010](0010-barrios-creados-por-usuarios.md)      | Barrios creados por los usuarios; zonas de trabajo del profesional (1 a 20)         |
 | [0011](0011-politica-de-contrasenas.md)           | Contraseñas: mínimo 8 (admin 12), argon2id                                          |
+| [0012](0012-cambio-de-rol.md)                     | Cambio de rol solo por el admin; el perfil anterior queda inactivo                  |
+| [0013](0013-baja-de-cuenta.md)                    | Baja con anonimización inmediata (sujeta a revisión legal)                          |
+| [0014](0014-cuenta-comprometida.md)               | Cuenta comprometida: se recupera la misma cuenta                                    |
+| [0015](0015-login-con-google.md)                  | Login con Google para clientes y profesionales (etapa 7B)                           |
 
 Las decisiones todavía abiertas están en [pendientes.md](pendientes.md).

@@ -9,7 +9,8 @@ Monolito modular NestJS (plan §5–7). Controllers delgados, reglas de negocio 
 | 3. Bootstrap                | Hecha: configuración validada, pipeline HTTP, errores, logger, rate limit, Swagger, health live, Docker, CI                                                                                              |
 | 4. Base de datos            | Hecha: TypeORM, migraciones, roles de base, auditoría append-only, catálogos (ubicaciones, oficios, planes), `/health/ready`                                                                             |
 | 5. Usuarios y autenticación | Hecha: registro en dos pasos con barrios creados por usuarios, login con cookies, refresh rotativo, CSRF, MFA del admin, reset por admin, guards globales (ver `docs/auth.md` y `docs/authorization.md`) |
-| 6. Autorización y estados   | Pendiente: cambio de rol, suspensión con revocación, test que recorre todas las rutas                                                                                                                    |
+| 6. Autorización y estados   | Hecha: suspensión, baneo, restauración, cambio de rol, revocación de sesiones y baja con anonimización (admin y propia); test que recorre todas las rutas                                                |
+| 7–13                        | Pendientes (ver `docs/roadmap.md`, incluye la etapa 7B de login con Google)                                                                                                                              |
 
 ## Estructura actual
 
@@ -110,3 +111,13 @@ Detalle de cada guard en `docs/authorization.md`. El de suscripción/plan llega 
   usados en constructores con `@Inject` se importan como tipo.
 - **Barrios por "buscar o crear"** con `INSERT … ON CONFLICT DO NOTHING` (sin carreras) dentro de la
   transacción del registro.
+
+**Etapa 6**
+
+- **`AccountsService` (módulo `users`)** concentra el ciclo de vida: cada acción bloquea la fila del
+  usuario (`FOR UPDATE`), valida la transición, revoca sesiones y audita en una sola transacción.
+- **`ProfessionalsService`** (alta, reactivación y desactivación del perfil, zonas de trabajo) lo usan
+  el registro y el cambio de rol: una sola implementación de las reglas de la ADR 0010.
+- **Sin tabla `role_changes`**: el historial de roles vive en la auditoría (`ROLE_CHANGED`).
+- **Test de todas las rutas**: lee las rutas registradas en Express y exige 401 sin sesión salvo una
+  lista explícita de públicas.

@@ -3,7 +3,7 @@
 API REST de un marketplace que conecta clientes con profesionales de oficios en Córdoba Capital.
 NestJS 12 · TypeORM 1.x · PostgreSQL 17 · Node 26. La consume un frontend Next.js con cookies HttpOnly.
 
-> Estado: **etapa 5 (usuarios y autenticación)**. Ver `docs/architecture.md` y `docs/auth.md`.
+> Estado: **etapa 6 (autorización y estados de cuenta)**. Ver `docs/roadmap.md`, `docs/architecture.md` y `docs/auth.md`.
 
 ## Requisitos
 

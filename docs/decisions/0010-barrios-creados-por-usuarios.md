@@ -18,7 +18,8 @@ viva en un barrio no cargado.
 - **Profesional**: no indica dónde vive; indica **dónde trabaja**: de 1 a 20 zonas (configurable,
   `MAX_SERVICE_AREAS`). Una zona es un barrio o **toda una localidad**; si elige toda la localidad,
   los barrios sueltos de esa misma localidad se descartan.
-- Los barrios pendientes no se muestran en el perfil público (propuesta aplicada; se puede cambiar).
+- Los barrios pendientes no se muestran en el perfil público hasta que el admin los apruebe
+  (confirmado por el fundador el 02/11/2026).
 
 **Consecuencias.** `neighborhoods` con `normalized_name` único por localidad, `status`
 (`PENDING`/`APPROVED`/`MERGED`), `merged_into_id`, `created_by_user_id`, `reviewed_by_id`.

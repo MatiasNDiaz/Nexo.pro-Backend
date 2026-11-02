@@ -111,7 +111,9 @@ sequenceDiagram
 | Cerrar uno       | `DELETE /auth/sessions/:id` | Solo propios (404 si no)                                        |
 
 También se revocan sesiones al restablecer la contraseña (todas), al cambiarla (todas menos la actual)
-y al detectar reutilización de un refresh. Las de cambio de rol, suspensión y baja llegan en la etapa 6.
+al detectar reutilización de un refresh, al suspender o banear, al cambiar el rol, al dar de baja la
+cuenta y cuando el admin cierra todos los dispositivos de una cuenta comprometida (ver
+`docs/authorization.md`).
 
 ### Email y contraseña
 
@@ -228,6 +230,6 @@ Cambiá la contraseña después del primer login.
 
 ## Qué falta (ver `docs/decisions/pendientes.md`)
 
-CAPTCHA tras varios fallos, chequeo de contraseñas filtradas, cambio de email, Google OAuth (etapa 13),
+CAPTCHA tras varios fallos, chequeo de contraseñas filtradas, cambio de email, Google OAuth (etapa 7B, ADR 0015),
 rotación/reenrolamiento del TOTP del admin, job de limpieza de sesiones vencidas y proveedor real de
 email (sin él la API no arranca en producción).
