@@ -1,0 +1,28 @@
+# Dependencias y builds
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Variables de entorno: solo se versionan las plantillas sin secretos
+.env
+.env.*
+!.env.example
+!.env.development
+!.env.test
+!.env.production.example
+
+# Claves y certificados
+*.pem
+*.key
+
+# Logs y sistema
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Editores
+.idea/
+.vscode/*
+!.vscode/extensions.json

@@ -1,0 +1,5 @@
+# Finales de línea LF en el repositorio y en la copia de trabajo (Prettier y Docker los esperan)
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.mp4 binary

@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+package-lock.json
+# Documentación funcional y material de referencia: se versiona tal como la entregó el fundador
+docs/flujo-integral.md
+docs/contexto-funcional.md
+docs/seguridad.md
+docs/PLAN_BACKEND_REPARA_YA_NEXO_PRO.md
+docs/prompts
+docs/referencia
