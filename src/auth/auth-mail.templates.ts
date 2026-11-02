@@ -36,6 +36,21 @@ export function passwordResetMail(to: string, firstName: string, link: string): 
   };
 }
 
+export function accountDeletionScheduledMail(
+  to: string,
+  firstName: string,
+  deletionScheduledFor: Date,
+): MailMessage {
+  const date = deletionScheduledFor.toLocaleDateString('es-AR', {
+    timeZone: 'America/Argentina/Cordoba',
+  });
+  return {
+    to,
+    subject: 'Tu cuenta se va a eliminar',
+    text: `Hola ${firstName}:\n\nTu cuenta quedó desactivada y sus datos se eliminarán definitivamente el ${date}. Si fue un error, escribinos a soporte antes de esa fecha para recuperarla.`,
+  };
+}
+
 export function passwordChangedMail(to: string, firstName: string): MailMessage {
   return {
     to,

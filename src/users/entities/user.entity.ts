@@ -22,6 +22,8 @@ import { AccountStatus, UserRole, VerificationStatus } from '../user.enums';
 // Único entre cuentas no borradas: índice parcial creado en la migración.
 @Index('uq_users_email', { synchronize: false })
 @Index(['neighborhoodId'])
+// Parcial (solo cuentas en gracia): creado en la migración.
+@Index('ix_users_deletion_scheduled_for', { synchronize: false })
 @Check('ck_users_failed_login_attempts', 'failed_login_attempts >= 0')
 // Las cuentas borradas se anonimizan (ADR 0013) y pierden el barrio.
 @Check(
@@ -49,6 +51,13 @@ export class User {
     default: AccountStatus.PENDING_VERIFICATION,
   })
   status: AccountStatus;
+
+  /**
+   * Baja en período de gracia (ADR 0016): la cuenta está DEACTIVATED y se anonimiza en esta fecha.
+   * Null si no hay una baja pendiente.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  deletionScheduledFor: Date | null;
 
   /** Motivo de la suspensión o el baneo; el usuario lo ve en /auth/me (ADR 0007). */
   @Column({ type: 'varchar', length: 500, nullable: true })

@@ -10,5 +10,6 @@ import { UsersController } from './users.controller';
   imports: [AuthModule, LocationsModule, ProfessionalsModule],
   controllers: [UsersController, AdminUsersController],
   providers: [AccountsService],
+  exports: [AccountsService],
 })
 export class UsersModule {}

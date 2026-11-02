@@ -6,16 +6,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityManager } from 'typeorm';
 import { AUDIT_LOGGER, type AuditLogger } from '../audit/audit-logger';
+import { type AccountDeletionScheduledEvent, AuthEvents } from '../auth/auth.events';
 import { SessionRevokeReason } from '../auth/entities/auth-session.entity';
 import { OneTimeToken } from '../auth/entities/one-time-token.entity';
-import { UserMfaSettings } from '../auth/entities/user-mfa-settings.entity';
 import { PasswordService } from '../auth/services/password.service';
 import { SessionsService } from '../auth/services/sessions.service';
 import type { AuthUser } from '../common/decorators';
+import { type AuthConfig, authConfig } from '../config/auth.config';
 import { NeighborhoodsService } from '../locations/neighborhoods.service';
 import { ProfessionalsService } from '../professionals/professionals.service';
+import { accountsDueForAnonymization, anonymizeAccount } from './account-anonymizer';
 import { ChangeRoleDto } from './dto/account-admin.dto';
 import { User } from './entities/user.entity';
 import { AccountStatus, UserRole, VerificationStatus } from './user.enums';
@@ -40,6 +43,8 @@ export class AccountsService {
     private readonly passwords: PasswordService,
     private readonly neighborhoods: NeighborhoodsService,
     private readonly professionals: ProfessionalsService,
+    private readonly events: EventEmitter2,
+    @Inject(authConfig.KEY) private readonly config: AuthConfig,
     @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
   ) {}
 
@@ -63,17 +68,34 @@ export class AccountsService {
     });
   }
 
-  /** Levanta una suspensión o un baneo. Vuelve a ACTIVE solo si la identidad está aprobada. */
-  restore(admin: AuthUser, userId: string, reason: string): Promise<User> {
-    return this.changeStatus(admin, userId, reason, {
-      action: 'ACCOUNT_RESTORED',
-      verb: 'restaurar',
-      from: [AccountStatus.SUSPENDED, AccountStatus.BANNED],
-      to: (user) =>
+  /**
+   * Levanta una suspensión, un baneo o una baja todavía en período de gracia (ADR 0016). Vuelve a
+   * ACTIVE solo si la identidad está aprobada; si no, a PENDING_VERIFICATION.
+   */
+  async restore(admin: AuthUser, userId: string, reason: string): Promise<User> {
+    return this.dataSource.transaction(async (manager) => {
+      const user = await this.lockTarget(manager, userId);
+      const pendingDeletion =
+        user.status === AccountStatus.DEACTIVATED && user.deletionScheduledFor;
+      const sanctioned =
+        user.status === AccountStatus.SUSPENDED || user.status === AccountStatus.BANNED;
+      if (!pendingDeletion && !sanctioned) throw invalidTransition(user.status, 'restaurar');
+
+      const status =
         user.verificationStatus === VerificationStatus.APPROVED
           ? AccountStatus.ACTIVE
-          : AccountStatus.PENDING_VERIFICATION,
-      revoke: false,
+          : AccountStatus.PENDING_VERIFICATION;
+      await manager
+        .getRepository(User)
+        .update(user.id, { status, statusReason: null, deletionScheduledFor: null });
+      if (pendingDeletion && user.role === UserRole.PROFESSIONAL) {
+        await this.professionals.reactivate(manager, user.id);
+      }
+      await this.record(manager, admin.id, 'ACCOUNT_RESTORED', user.id, reason, {
+        from: user.status,
+        to: status,
+      });
+      return manager.getRepository(User).findOneByOrFail({ id: user.id });
     });
   }
 
@@ -93,6 +115,8 @@ export class AccountsService {
   async changeRole(admin: AuthUser, userId: string, dto: ChangeRoleDto): Promise<User> {
     return this.dataSource.transaction(async (manager) => {
       const user = await this.lockTarget(manager, userId);
+      if (user.status === AccountStatus.DEACTIVATED)
+        throw invalidTransition(user.status, 'cambiar el rol de');
       if (user.role === dto.role) {
         throw new ConflictException({ code: 'SAME_ROLE', message: `La cuenta ya es ${dto.role}.` });
       }
@@ -114,13 +138,49 @@ export class AccountsService {
     });
   }
 
-  /** Baja por el admin (ADR 0013). */
+  /** Baja por el admin (ADR 0013 y 0016): período de gracia y después anonimización. */
   async deleteByAdmin(admin: AuthUser, userId: string, reason: string): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
-      const user = await this.lockTarget(manager, userId);
-      await this.anonymize(manager, user);
-      await this.record(manager, admin.id, 'ACCOUNT_DELETED', user.id, reason, { by: 'ADMIN' });
+    const user = await this.dataSource.transaction(async (manager) => {
+      const target = await this.lockTarget(manager, userId);
+      await this.scheduleDeletion(manager, target);
+      await this.record(manager, admin.id, 'ACCOUNT_DELETION_SCHEDULED', target.id, reason, {
+        by: 'ADMIN',
+      });
+      return manager.getRepository(User).findOneByOrFail({ id: target.id });
     });
+    await this.notifyDeletionScheduled(user);
+  }
+
+  /**
+   * Anonimiza las cuentas cuyo período de gracia venció. Lo corre el comando `accounts:purge`
+   * (programarlo una vez por día). Devuelve cuántas cuentas anonimizó.
+   */
+  async purgeExpiredDeletions(now = new Date()): Promise<number> {
+    const due = await accountsDueForAnonymization(this.dataSource.manager, now);
+    let purged = 0;
+    for (const userId of due) {
+      await this.dataSource.transaction(async (manager) => {
+        const user = await manager
+          .getRepository(User)
+          .findOne({ where: { id: userId }, lock: { mode: 'pessimistic_write' } });
+        // Pudo haberse restaurado entre la búsqueda y el bloqueo.
+        if (!user?.deletionScheduledFor || user.deletionScheduledFor > now) return;
+        await anonymizeAccount(manager, user.id);
+        await this.audit.record(
+          {
+            actorId: null,
+            action: 'ACCOUNT_ANONYMIZED',
+            targetType: 'USER',
+            targetId: user.id,
+            reason: null,
+            result: 'SUCCESS',
+          },
+          manager,
+        );
+        purged++;
+      });
+    }
+    return purged;
   }
 
   /** Baja de la propia cuenta: exige la contraseña. El admin no puede darse de baja así. */
@@ -143,11 +203,15 @@ export class AccountsService {
         message: 'La contraseña no es correcta.',
       });
     }
-    await this.dataSource.transaction(async (manager) => {
-      const user = await this.lockTarget(manager, authUser.id);
-      await this.anonymize(manager, user);
-      await this.record(manager, user.id, 'ACCOUNT_DELETED', user.id, null, { by: 'SELF' });
+    const user = await this.dataSource.transaction(async (manager) => {
+      const target = await this.lockTarget(manager, authUser.id);
+      await this.scheduleDeletion(manager, target);
+      await this.record(manager, target.id, 'ACCOUNT_DELETION_SCHEDULED', target.id, null, {
+        by: 'SELF',
+      });
+      return manager.getRepository(User).findOneByOrFail({ id: target.id });
     });
+    await this.notifyDeletionScheduled(user);
   }
 
   private async changeStatus(
@@ -222,28 +286,36 @@ export class AccountsService {
   }
 
   /**
-   * Anonimiza la cuenta (ADR 0013): borra los datos personales y deja una cuenta inutilizable.
-   * Se conservan el id (seudónimo) y los registros que lo referencian: pagos, reportes, auditoría.
+   * Baja con período de gracia (ADR 0016): la cuenta queda DEACTIVATED (no puede iniciar sesión,
+   * el email sigue reservado), con sus datos, hasta `deletionScheduledFor`. Se revocan las
+   * sesiones, se anulan los enlaces pendientes y se oculta el perfil profesional.
    */
-  private async anonymize(manager: EntityManager, user: User): Promise<void> {
+  private async scheduleDeletion(manager: EntityManager, user: User): Promise<void> {
+    if (user.deletionScheduledFor) {
+      throw new ConflictException({
+        code: 'DELETION_ALREADY_SCHEDULED',
+        message: 'La cuenta ya tiene una baja en curso.',
+      });
+    }
+    const days = this.config.accountDeletionGraceDays;
     await manager.getRepository(User).update(user.id, {
-      email: `deleted-${user.id}@deleted.invalid`,
-      firstName: 'Cuenta',
-      lastName: 'eliminada',
-      phone: '',
-      // Hash imposible de satisfacer: ninguna contraseña lo verifica.
-      passwordHash: '!',
-      neighborhoodId: null,
       status: AccountStatus.DEACTIVATED,
       statusReason: null,
-      emailVerifiedAt: null,
-      lockedUntil: null,
-      deletedAt: new Date(),
+      deletionScheduledFor: new Date(Date.now() + days * 24 * 3600 * 1000),
     });
-    await manager.getRepository(UserMfaSettings).delete({ userId: user.id });
     await manager.getRepository(OneTimeToken).delete({ userId: user.id });
     await this.professionals.deactivate(manager, user.id);
     await this.sessions.revokeAllForUser(user.id, SessionRevokeReason.ACCOUNT_DELETED, { manager });
+  }
+
+  private async notifyDeletionScheduled(user: User): Promise<void> {
+    if (!user.deletionScheduledFor) return;
+    const event: AccountDeletionScheduledEvent = {
+      email: user.email,
+      firstName: user.firstName,
+      deletionScheduledFor: user.deletionScheduledFor,
+    };
+    await this.events.emitAsync(AuthEvents.ACCOUNT_DELETION_SCHEDULED, event);
   }
 
   /** Bloquea la fila (serializa acciones simultáneas) y rechaza cuentas borradas o de admin. */

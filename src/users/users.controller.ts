@@ -17,8 +17,9 @@ export class UsersController {
   ) {}
 
   /**
-   * Baja de la propia cuenta (ADR 0013): exige la contraseña, anonimiza los datos personales y
-   * cierra todas las sesiones. No disponible para cuentas suspendidas o baneadas (ADR 0007).
+   * Baja de la propia cuenta (ADR 0013 y 0016): exige la contraseña y cierra todas las sesiones.
+   * La cuenta queda desactivada durante el período de gracia y después se anonimiza. No disponible
+   * para cuentas suspendidas o baneadas (ADR 0007).
    */
   @Delete('me')
   @HttpCode(204)

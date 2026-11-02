@@ -8,6 +8,7 @@ import { UserCreatedNeighborhoods1793640006000 } from './1793640006000-UserCreat
 import { CreateAuthTables1793640007000 } from './1793640007000-CreateAuthTables';
 import { CreateProfessionalProfiles1793640008000 } from './1793640008000-CreateProfessionalProfiles';
 import { AccountLifecycle1793640009000 } from './1793640009000-AccountLifecycle';
+import { AccountDeletionGracePeriod1793640010000 } from './1793640010000-AccountDeletionGracePeriod';
 
 /**
  * Lista explícita (en orden) de migraciones. Se registran a mano en vez de con un glob para que
@@ -25,4 +26,5 @@ export const MIGRATIONS = [
   CreateAuthTables1793640007000,
   CreateProfessionalProfiles1793640008000,
   AccountLifecycle1793640009000,
+  AccountDeletionGracePeriod1793640010000,
 ];

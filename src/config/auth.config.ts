@@ -47,6 +47,7 @@ export const authConfig = registerAs('auth', () => {
     csrfSecret: env.CSRF_SECRET,
     passwordSelfResetEnabled: env.PASSWORD_SELF_RESET_ENABLED,
     maxServiceAreas: env.MAX_SERVICE_AREAS,
+    accountDeletionGraceDays: env.ACCOUNT_DELETION_GRACE_DAYS,
   };
 });
 

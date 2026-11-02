@@ -3,12 +3,14 @@ import { DataSource, IsNull } from 'typeorm';
 import { AdminAuditLog } from '../src/audit/entities/admin-audit-log.entity';
 import { AuthSession } from '../src/auth/entities/auth-session.entity';
 import { ProfessionalProfile } from '../src/professionals/entities/professional-profile.entity';
+import { AccountsService } from '../src/users/accounts.service';
 import { User } from '../src/users/entities/user.entity';
 import { AccountStatus, VerificationStatus } from '../src/users/user.enums';
 import {
   Client,
   cordobaLocalityId,
   customerPayload,
+  mailbox,
   parseSetCookies,
   PASSWORD,
   professionId,
@@ -192,8 +194,10 @@ describe('Ciclo de vida de la cuenta (e2e)', () => {
     await expect(auditCount('SESSIONS_REVOKED', user.id)).resolves.toBe(1);
   });
 
-  describe('baja con anonimización (ADR 0013)', () => {
-    it('la baja propia exige la contraseña, borra los datos personales y cierra la sesión', async () => {
+  describe('baja con período de gracia y anonimización (ADR 0013 y 0016)', () => {
+    const DAY_MS = 24 * 3600 * 1000;
+
+    it('la baja propia exige la contraseña, desactiva la cuenta 30 días con sus datos y avisa por email', async () => {
       const user = await signInCustomer(app);
       expect((await user.client.delete('/users/me').send({ password: 'incorrecta' })).status).toBe(
         400,
@@ -203,6 +207,60 @@ describe('Ciclo de vida de la cuenta (e2e)', () => {
       expect(parseSetCookies(res.headers['set-cookie']).get('nx_at')?.value).toBe('');
 
       const stored = await userById(user.id);
+      expect(stored).toMatchObject({ email: user.email, status: AccountStatus.DEACTIVATED });
+      expect(stored.deletedAt).toBeNull();
+      const days = ((stored.deletionScheduledFor?.getTime() ?? 0) - Date.now()) / DAY_MS;
+      expect(days).toBeGreaterThan(29.9);
+      expect(days).toBeLessThanOrEqual(30);
+      await expect(
+        dataSource.getRepository(AuthSession).countBy({ userId: user.id, revokedAt: IsNull() }),
+      ).resolves.toBe(0);
+      expect((await new Client(app).login(user.email)).status).toBe(401);
+      expect(mailbox(app).lastTo(user.email)?.subject).toBe('Tu cuenta se va a eliminar');
+      await expect(auditCount('ACCOUNT_DELETION_SCHEDULED', user.id)).resolves.toBe(1);
+
+      // Durante la gracia el email sigue reservado: un registro nuevo no crea otra cuenta.
+      const client = new Client(app);
+      await client.post(
+        '/auth/register',
+        customerPayload(user.email, await cordobaLocalityId(client)),
+      );
+      await expect(dataSource.getRepository(User).countBy({ email: user.email })).resolves.toBe(1);
+    });
+
+    it('durante la gracia el admin puede restaurarla (y reactiva el perfil profesional)', async () => {
+      const user = await signInCustomer(app);
+      await dataSource
+        .getRepository(User)
+        .update(user.id, { verificationStatus: VerificationStatus.APPROVED });
+      expect((await admin.delete(`/admin/users/${user.id}`).send({ reason: REASON })).status).toBe(
+        204,
+      );
+      expect((await user.client.get('/auth/me')).status).toBe(401);
+      const again = await admin.delete(`/admin/users/${user.id}`).send({ reason: REASON });
+      expect(again.body.code).toBe('DELETION_ALREADY_SCHEDULED');
+
+      const restored = await admin.post(`/admin/users/${user.id}/restore`, { reason: REASON });
+      expect(restored.body.status).toBe('ACTIVE');
+      expect((await userById(user.id)).deletionScheduledFor).toBeNull();
+      expect((await new Client(app).login(user.email)).status).toBe(200);
+    });
+
+    it('vencida la gracia, la purga anonimiza la cuenta y libera el email', async () => {
+      const user = await signInCustomer(app);
+      await user.client.delete('/users/me').send({ password: PASSWORD });
+      const accounts = app.get(AccountsService);
+
+      // Antes del vencimiento no toca nada.
+      await accounts.purgeExpiredDeletions();
+      expect((await userById(user.id)).email).toBe(user.email);
+
+      await dataSource
+        .getRepository(User)
+        .update(user.id, { deletionScheduledFor: new Date(Date.now() - 1000) });
+      expect(await accounts.purgeExpiredDeletions()).toBeGreaterThanOrEqual(1);
+
+      const stored = await userById(user.id);
       expect(stored).toMatchObject({
         email: `deleted-${user.id}@deleted.invalid`,
         firstName: 'Cuenta',
@@ -210,21 +268,20 @@ describe('Ciclo de vida de la cuenta (e2e)', () => {
         phone: '',
         neighborhoodId: null,
         status: AccountStatus.DEACTIVATED,
+        deletionScheduledFor: null,
       });
       expect(stored.deletedAt).not.toBeNull();
-      await expect(
-        dataSource.getRepository(AuthSession).countBy({ userId: user.id, revokedAt: IsNull() }),
-      ).resolves.toBe(0);
-      expect((await new Client(app).login(user.email)).status).toBe(401);
-      await expect(auditCount('ACCOUNT_DELETED', user.id)).resolves.toBe(1);
-
-      // El email queda libre para una cuenta nueva.
+      await expect(auditCount('ACCOUNT_ANONYMIZED', user.id)).resolves.toBe(1);
+      // Ya no se puede restaurar (no existe para la API) y el email queda libre.
+      expect((await admin.post(`/admin/users/${user.id}/restore`, { reason: REASON })).status).toBe(
+        404,
+      );
       const client = new Client(app);
-      const again = await client.post(
+      const fresh = await client.post(
         '/auth/register',
         customerPayload(user.email, await cordobaLocalityId(client)),
       );
-      expect(again.status).toBe(202);
+      expect(fresh.status).toBe(202);
       await expect(dataSource.getRepository(User).countBy({ email: user.email })).resolves.toBe(1);
     });
 
@@ -232,17 +289,6 @@ describe('Ciclo de vida de la cuenta (e2e)', () => {
       const user = await signInCustomer(app, AccountStatus.SUSPENDED);
       const res = await user.client.delete('/users/me').send({ password: PASSWORD });
       expect(res.status).toBe(403);
-    });
-
-    it('el admin puede dar de baja una cuenta (con motivo) y no se puede repetir', async () => {
-      const user = await signInCustomer(app);
-      expect((await admin.delete(`/admin/users/${user.id}`).send({ reason: REASON })).status).toBe(
-        204,
-      );
-      expect((await user.client.get('/auth/me')).status).toBe(401);
-      expect((await admin.delete(`/admin/users/${user.id}`).send({ reason: REASON })).status).toBe(
-        404,
-      );
     });
   });
 });

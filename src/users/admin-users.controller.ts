@@ -78,7 +78,7 @@ export class AdminUsersController {
     return this.accounts.revokeSessions(admin, id, dto.reason);
   }
 
-  /** Baja con anonimización (ADR 0013). No se puede deshacer. */
+  /** Baja (ADR 0013 y 0016): restaurable con `restore` durante el período de gracia. */
   @Delete(':id')
   @HttpCode(204)
   delete(

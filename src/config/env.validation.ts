@@ -206,6 +206,13 @@ export class EnvironmentVariables {
   @MinLength(3)
   MAIL_FROM = 'Nexo PRO <no-reply@localhost>';
 
+  /** Días que una cuenta dada de baja queda restaurable antes de anonimizarse (ADR 0016). */
+  @Transform(toInt)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  ACCOUNT_DELETION_GRACE_DAYS = 30;
+
   /** Máximo de zonas (barrios o localidades completas) por profesional (ADR 0010). */
   @Transform(toInt)
   @IsInt()

@@ -8,7 +8,14 @@ export const AuthEvents = {
   ALREADY_REGISTERED: 'auth.already-registered',
   PASSWORD_RESET_REQUESTED: 'auth.password-reset-requested',
   PASSWORD_CHANGED: 'auth.password-changed',
+  ACCOUNT_DELETION_SCHEDULED: 'account.deletion-scheduled',
 } as const;
+
+export interface AccountDeletionScheduledEvent {
+  email: string;
+  firstName: string;
+  deletionScheduledFor: Date;
+}
 
 export interface TokenMailEvent {
   email: string;

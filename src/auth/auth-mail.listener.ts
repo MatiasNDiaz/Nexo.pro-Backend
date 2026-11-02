@@ -7,6 +7,7 @@ import {
   type MailProvider,
 } from '../integrations/mail/mail-provider';
 import {
+  accountDeletionScheduledMail,
   alreadyRegisteredMail,
   emailVerificationMail,
   FRONTEND_PATHS,
@@ -14,6 +15,7 @@ import {
   passwordResetMail,
 } from './auth-mail.templates';
 import {
+  type AccountDeletionScheduledEvent,
   type AlreadyRegisteredEvent,
   AuthEvents,
   type TokenMailEvent,
@@ -54,6 +56,13 @@ export class AuthMailListener {
   @OnEvent(AuthEvents.PASSWORD_CHANGED, { promisify: true })
   onPasswordChanged(event: UserMailEvent): Promise<void> {
     return this.send(passwordChangedMail(event.email, event.firstName));
+  }
+
+  @OnEvent(AuthEvents.ACCOUNT_DELETION_SCHEDULED, { promisify: true })
+  onAccountDeletionScheduled(event: AccountDeletionScheduledEvent): Promise<void> {
+    return this.send(
+      accountDeletionScheduledMail(event.email, event.firstName, event.deletionScheduledFor),
+    );
   }
 
   private link(path: string, token: string): string {
