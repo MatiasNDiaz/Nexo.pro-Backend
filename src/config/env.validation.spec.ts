@@ -3,9 +3,28 @@ import { validateEnv } from './env.validation';
 const base = {
   NODE_ENV: 'development',
   FRONTEND_ORIGINS: 'http://localhost:3000',
+  DATABASE_URL: 'postgres://app:clave@localhost:5432/nexo_dev',
 };
 
 describe('validateEnv', () => {
+  it('exige DATABASE_URL de PostgreSQL sin mostrar la contraseña de la URL', () => {
+    let message = '';
+    try {
+      validateEnv({ ...base, DATABASE_URL: 'mysql://app:contraseña-super-secreta@db/x' });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toMatch(/DATABASE_URL/);
+    expect(message).not.toContain('contraseña-super-secreta');
+  });
+
+  it('DATABASE_MIGRATIONS_URL es opcional y el pool tiene un valor por defecto', () => {
+    const env = validateEnv(base);
+    expect(env.DATABASE_MIGRATIONS_URL).toBeUndefined();
+    expect(env.DB_POOL_MAX).toBe(10);
+    expect(env.DB_SSL).toBe(false);
+  });
+
   it('aplica los valores por defecto (puerto 3001, prefijo api, Swagger apagado)', () => {
     const env = validateEnv(base);
     expect(env.PORT).toBe(3001);
@@ -61,7 +80,7 @@ describe('validateEnv', () => {
   });
 
   describe('en producción', () => {
-    const prod = { NODE_ENV: 'production', FRONTEND_ORIGINS: 'https://app.example.com' };
+    const prod = { ...base, NODE_ENV: 'production', FRONTEND_ORIGINS: 'https://app.example.com' };
 
     it('acepta una configuración segura', () => {
       expect(() => validateEnv(prod)).not.toThrow();

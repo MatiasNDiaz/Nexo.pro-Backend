@@ -6,8 +6,17 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
 import { ApiErrorBody } from '../errors/api-error';
 import { AllExceptionsFilter } from './all-exceptions.filter';
+
+function pgError(code: string): QueryFailedError {
+  const driverError = Object.assign(new Error('duplicate key value violates "uq_users_email"'), {
+    code,
+    constraint: 'uq_users_email',
+  });
+  return new QueryFailedError('INSERT INTO users ...', ['ana@example.com'], driverError);
+}
 
 function run(
   exception: unknown,
@@ -93,6 +102,22 @@ describe('AllExceptionsFilter', () => {
     );
     expect(status).toBe(422);
     expect(body.code).toBe('PLAN_LIMIT_REACHED');
+  });
+
+  it.each(['23505', '23503'])(
+    'traduce la violación de integridad %s de PostgreSQL a 409 sin exponer el constraint',
+    (code) => {
+      const { status, body } = run(pgError(code));
+      expect(status).toBe(409);
+      expect(body.code).toBe('CONFLICT');
+      expect(JSON.stringify(body)).not.toMatch(/uq_users_email|users|ana@example\.com/);
+    },
+  );
+
+  it('trata como 500 cualquier otro error de PostgreSQL', () => {
+    const { status, body } = run(pgError('42P01'));
+    expect(status).toBe(500);
+    expect(JSON.stringify(body)).not.toContain('users');
   });
 
   it('devuelve requestId null si la request no tiene id', () => {

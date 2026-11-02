@@ -42,6 +42,11 @@ describe('redacción del logger', () => {
       expect(output).not.toContain(secret);
     }
   });
+
+  it('oculta los parámetros de una query fallida de TypeORM', () => {
+    const output = captureLog({ err: { query: 'INSERT ...', parameters: ['ana@example.com'] } });
+    expect(output).not.toContain('ana@example.com');
+  });
 });
 
 describe('generateRequestId', () => {

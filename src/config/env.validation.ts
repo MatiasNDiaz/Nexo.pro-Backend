@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsOptional,
   IsString,
   Matches,
   Max,
@@ -20,6 +21,8 @@ export type LogLevel = (typeof LOG_LEVELS)[number];
 
 /** Origen exacto: esquema + host + puerto opcional, sin path, sin barra final y sin comodines. */
 const ORIGIN_PATTERN = /^https?:\/\/[a-z0-9.-]+(:\d{1,5})?$/i;
+
+const POSTGRES_URL_PATTERN = /^postgres(ql)?:\/\/\S+$/;
 
 const toBoolean = ({ value }: { value: unknown }) =>
   value === true || value === 'true' ? true : value === false || value === 'false' ? false : value;
@@ -88,6 +91,25 @@ export class EnvironmentVariables {
   @IsInt()
   @Min(1)
   THROTTLE_LIMIT = 100;
+
+  /** Conexión de runtime (usuario con privilegios mínimos: solo SELECT/INSERT/UPDATE/DELETE). */
+  @Matches(POSTGRES_URL_PATTERN)
+  DATABASE_URL: string;
+
+  /** Conexión con permisos de DDL, solo para migraciones y seeds. Si falta, se usa DATABASE_URL. */
+  @IsOptional()
+  @Matches(POSTGRES_URL_PATTERN)
+  DATABASE_MIGRATIONS_URL?: string;
+
+  @Transform(toBoolean)
+  @IsBoolean()
+  DB_SSL = false;
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  DB_POOL_MAX = 10;
 }
 
 /** Reglas que dependen del ambiente y no se expresan con un decorador por campo. */

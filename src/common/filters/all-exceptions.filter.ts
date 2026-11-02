@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { QueryFailedError } from 'typeorm';
 import { ApiErrorBody, ApiErrorDetail, DEFAULT_ERROR_CODES } from '../errors/api-error';
 
 const GENERIC_SERVER_MESSAGE = 'Ocurrió un error inesperado. Intentá de nuevo más tarde.';
@@ -48,8 +49,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
   }
 }
 
+/**
+ * Violaciones de integridad de PostgreSQL que reflejan un conflicto del cliente. Se responden
+ * con 409 y un mensaje genérico: nunca se exponen nombres de tablas ni de constraints.
+ */
+const POSTGRES_CONFLICTS: Record<string, string> = {
+  '23505': 'Ya existe un registro con esos datos.',
+  '23503': 'La operación entra en conflicto con datos relacionados.',
+};
+
 function resolve(exception: unknown): ResolvedError {
   if (exception instanceof HttpException) return fromHttpException(exception);
+  if (exception instanceof QueryFailedError) {
+    return fromPostgresError(exception.driverError as { code?: unknown });
+  }
   const clientError = fromExposedClientError(exception);
   if (clientError) return clientError;
   return serverError(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -84,6 +97,13 @@ function fromExposedClientError(exception: unknown): ResolvedError | null {
   const message =
     status === 413 ? 'El cuerpo de la solicitud es demasiado grande.' : 'Solicitud inválida.';
   return { status, code: defaultCode(status), message, details: [] };
+}
+
+function fromPostgresError(driverError: { code?: unknown }): ResolvedError {
+  const sqlState = driverError.code;
+  const message = typeof sqlState === 'string' ? POSTGRES_CONFLICTS[sqlState] : undefined;
+  if (!message) return serverError(HttpStatus.INTERNAL_SERVER_ERROR);
+  return { status: HttpStatus.CONFLICT, code: 'CONFLICT', message, details: [] };
 }
 
 function serverError(status: number): ResolvedError {

@@ -28,6 +28,9 @@ export const REDACTED_PATHS = [
   '*.csrfToken',
   'dni',
   '*.dni',
+  // QueryFailedError de TypeORM incluye los parámetros de la query (emails, hashes, etc.).
+  'parameters',
+  '*.parameters',
 ];
 
 /** El id de request lo genera siempre el servidor: no se confía en uno enviado por el cliente. */
