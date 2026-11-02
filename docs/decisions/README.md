@@ -14,5 +14,7 @@ Formato: contexto, decisión, consecuencias, fecha. Para cambiar una decisión s
 | [0007](0007-acceso-cuentas-suspendidas.md)        | Cuentas suspendidas/baneadas: solo motivo, apelación y logout                       |
 | [0008](0008-duracion-tokens-y-cookies.md)         | Duración de tokens y prefijo de cookies `nx_`                                       |
 | [0009](0009-limites-plan-premium.md)              | Premium: 5 imágenes y 2 videos (configurable)                                       |
+| [0010](0010-barrios-creados-por-usuarios.md)      | Barrios creados por los usuarios; zonas de trabajo del profesional (1 a 20)         |
+| [0011](0011-politica-de-contrasenas.md)           | Contraseñas: mínimo 8 (admin 12), argon2id                                          |
 
 Las decisiones todavía abiertas están en [pendientes.md](pendientes.md).

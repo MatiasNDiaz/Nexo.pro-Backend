@@ -19,7 +19,9 @@ API REST NestJS 12 + TypeORM 1.x + PostgreSQL, Node 26. Lo consume un frontend N
 
 ## Reglas permanentes
 
-- Toda ruta es privada por defecto; `@Public()` solo cuando corresponde. Rutas admin con `@Roles('ADMIN')`.
+- Toda ruta es privada por defecto; `@Public()` solo cuando corresponde. Rutas admin con `@Roles('ADMIN')`. Solo pasan cuentas `ACTIVE` salvo `@AllowAccountStates(...)` (ver `docs/authorization.md`).
+- Guards globales en este orden: Throttler → Origin → JWT cookie → CSRF → estado de cuenta → roles. No agregar guards por fuera de ese orden.
+- Con `isolatedModules` + `emitDecoratorMetadata`, los tipos usados en constructores con `@Inject` se importan con `import type` / `type X`.
 - Ownership en los servicios: filtrar por el usuario en la consulta y responder 404 si no es propio.
 - Todo input entra por un DTO con class-validator; todo string con `@MaxLength`; ids con `ParseUUIDPipe`.
 - Nunca devolver entidades: DTOs de salida por audiencia. Nunca exponer hashes, tokens ni documentos.

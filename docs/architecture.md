@@ -4,11 +4,12 @@ Monolito modular NestJS (plan §5–7). Controllers delgados, reglas de negocio 
 
 ## Estado por etapa
 
-| Etapa                       | Estado                                                                                                                       |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| 3. Bootstrap                | Hecha: configuración validada, pipeline HTTP, errores, logger, rate limit, Swagger, health live, Docker, CI                  |
-| 4. Base de datos            | Hecha: TypeORM, migraciones, roles de base, auditoría append-only, catálogos (ubicaciones, oficios, planes), `/health/ready` |
-| 5. Usuarios y autenticación | Pendiente                                                                                                                    |
+| Etapa                       | Estado                                                                                                                                                                                                   |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3. Bootstrap                | Hecha: configuración validada, pipeline HTTP, errores, logger, rate limit, Swagger, health live, Docker, CI                                                                                              |
+| 4. Base de datos            | Hecha: TypeORM, migraciones, roles de base, auditoría append-only, catálogos (ubicaciones, oficios, planes), `/health/ready`                                                                             |
+| 5. Usuarios y autenticación | Hecha: registro en dos pasos con barrios creados por usuarios, login con cookies, refresh rotativo, CSRF, MFA del admin, reset por admin, guards globales (ver `docs/auth.md` y `docs/authorization.md`) |
+| 6. Autorización y estados   | Pendiente: cambio de rol, suspensión con revocación, test que recorre todas las rutas                                                                                                                    |
 
 ## Estructura actual
 
@@ -35,18 +36,26 @@ src/
 │   ├── transformers.ts
 │   ├── migrations/             # SQL escrito a mano + index.ts con la lista ordenada
 │   └── seeds/                  # catálogos maestros idempotentes + CLI
+├── common/decorators/      # @Public, @Roles, @AllowAccountStates, @CurrentUser, @SkipCsrf…
+├── common/guards/          # Origin, JwtAuth, Csrf, AccountState, Roles (globales)
+├── common/crypto/          # tokens aleatorios, SHA-256, HMAC, AES-256-GCM
+├── auth/                   # registro, login, MFA, sesiones, CSRF, cookies, reset, CLI admin:create
+├── users/                  # entidad y enums de usuario
+├── professionals/entities/ # perfil mínimo, profesiones y zonas de trabajo
+├── integrations/mail/      # MailProvider + adaptadores consola/memoria
 ├── audit/                  # AuditService (puerto AUDIT_LOGGER), global
-├── locations/entities/     # provincias, localidades, barrios
-├── professions/entities/
+├── locations/              # provincias, localidades, barrios (normalización, autocompletado)
+├── professions/            # catálogo público de oficios
 ├── subscriptions/entities/ # planes
 └── health/                 # GET /api/v1/health/live y /ready
 test/
 ├── setup/                  # reset de la base de test (globalSetup)
+├── utils/                  # app de test y cliente con cookies (auth-client)
 ├── integration/            # contra PostgreSQL real
 └── *.e2e-spec.ts           # app real con Supertest
 ```
 
-Los módulos de catálogo (`locations`, `professions`, `subscriptions`) por ahora solo tienen entidades. Sus endpoints llegan en la etapa 7.
+`locations` y `professions` exponen solo lo que necesita el registro; su administración llega en la etapa 7.
 
 ## Pipeline de una request
 
@@ -57,13 +66,13 @@ flowchart LR
   C --> D[cookie-parser]
   D --> E[CORS allowlist]
   E --> F[pino-http: X-Request-Id + log con redacción]
-  F --> G[ThrottlerGuard]
+  F --> G[Throttler → Origin → JWT cookie → CSRF → Estado de cuenta → Roles]
   G --> H[ValidationPipe whitelist]
   H --> I[Controller]
   I -. excepción .-> J[AllExceptionsFilter: formato único]
 ```
 
-Las etapas 5 y 6 agregan, después del throttler y en este orden: `OriginGuard` → `JwtCookieAuthGuard` → `CsrfGuard` → `AccountStateGuard` → `RolesGuard` → `SubscriptionGuard`.
+Detalle de cada guard en `docs/authorization.md`. El de suscripción/plan llega en las etapas 7 y 9.
 
 ## Decisiones técnicas
 
@@ -85,3 +94,19 @@ Las etapas 5 y 6 agregan, después del throttler y en este orden: `OriginGuard` 
 - **`logging: false` en TypeORM** y redacción de `parameters` en el logger: los errores de queries incluyen los valores enviados (emails, hashes).
 - **`installExtensions: false`:** TypeORM no intenta crear extensiones al conectarse (el rol de runtime no puede); las crean las migraciones.
 - **Seeds idempotentes que no pisan datos:** `ON CONFLICT DO NOTHING` sobre la clave natural.
+
+**Etapa 5**
+
+- **JWT corto + sesión en base:** el guard valida la firma y además que la sesión `sid` siga viva; rol y
+  estado se leen de la base en cada request (revocación efectiva en la request siguiente).
+- **Una fila por refresh token** (`auth_sessions`); la familia es el dispositivo. Rotación atómica con
+  `SELECT … FOR UPDATE`; la detección de reutilización y su auditoría se confirman antes de responder 401.
+- **CSRF ligado a la familia** (no al `sid`): no cambia en cada refresh. En el refresh, un token ya
+  rotado se procesa antes de exigir CSRF, para que un refresh robado igual dispare la revocación.
+- **Rotación del secreto JWT** con `kid` en el header (secreto actual y anterior).
+- **Emails por eventos después del commit** (`@nestjs/event-emitter` + `emitAsync`): no se manda un
+  email por algo revertido, y los tests leen el buzón en memoria de forma determinista.
+- **`import type` en firmas decoradas:** con `isolatedModules` + `emitDecoratorMetadata`, los tipos
+  usados en constructores con `@Inject` se importan como tipo.
+- **Barrios por "buscar o crear"** con `INSERT … ON CONFLICT DO NOTHING` (sin carreras) dentro de la
+  transacción del registro.

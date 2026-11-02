@@ -12,98 +12,124 @@ agrega su parte y la documenta acá.
 | Ids             | `uuid` con `gen_random_uuid()` (nativo de PostgreSQL)                                                                                                 |
 | Fechas          | `timestamptz`, en UTC                                                                                                                                 |
 | Dinero          | `numeric(12,2)` + `currency char(3)`; en TypeScript es `string` para no perder precisión                                                              |
-| Únicos de texto | Sin distinguir mayúsculas: índice único sobre `lower(name)`                                                                                           |
-| Borrado         | Los catálogos no se borran: se desactivan con `active = false` (las FK son `ON DELETE RESTRICT`)                                                      |
+| Únicos de texto | Sin distinguir mayúsculas (`lower(name)` o `citext`); barrios por nombre normalizado                                                                  |
+| Borrado         | Catálogos: `active = false`. Usuarios: soft delete (`deleted_at`). FK `RESTRICT` salvo sesiones y tokens (`CASCADE`, descartables)                    |
+| Secretos        | Contraseñas con argon2id; refresh y enlaces de un solo uso: solo SHA-256; secreto TOTP cifrado (AES-256-GCM). **Sin DNI** (ADR 0006)                  |
 
 Un test de integración compara las entidades con el esquema real que dejan las migraciones; si alguien
 cambia una entidad sin migración (o al revés), falla.
 
-## Diagrama (etapa 4)
+## Diagrama (etapas 4 y 5)
 
 ```mermaid
 erDiagram
   provinces ||--o{ localities : "tiene"
   localities ||--o{ neighborhoods : "tiene"
+  neighborhoods |o--o{ neighborhoods : "merged_into_id (alias)"
+  neighborhoods |o--o{ users : "barrio donde vive (cliente)"
+  users ||--o{ auth_sessions : "abre"
+  auth_sessions |o--o| auth_sessions : "replaced_by_id"
+  users ||--o{ one_time_tokens : "recibe"
+  users ||--o| user_mfa_settings : "admin"
+  users ||--o| professional_profiles : "profesional"
+  professional_profiles ||--o{ professional_professions : "ofrece"
+  professions ||--o{ professional_professions : ""
+  professional_profiles ||--o{ professional_service_areas : "trabaja en"
+  localities ||--o{ professional_service_areas : ""
+  neighborhoods |o--o{ professional_service_areas : "null = toda la localidad"
+  users |o--o{ admin_audit_logs : "actor"
 
-  provinces {
+  users {
     uuid id PK
-    varchar name "único sin mayúsculas"
-    boolean active
-    timestamptz created_at
-    timestamptz updated_at
-  }
-  localities {
-    uuid id PK
-    uuid province_id FK
-    varchar name "único por provincia"
-    numeric lat "nullable"
-    numeric lng "nullable"
-    boolean active
+    citext email "único entre no borrados"
+    text password_hash "argon2id"
+    user_role role
+    account_status status
+    verification_status verification_status
+    varchar first_name
+    varchar last_name
+    varchar phone
+    uuid neighborhood_id FK "obligatorio para clientes"
+    timestamptz email_verified_at
+    int failed_login_attempts
+    timestamptz locked_until
+    timestamptz deleted_at
   }
   neighborhoods {
     uuid id PK
     uuid locality_id FK
-    varchar name "único por localidad"
-    numeric lat "nullable"
-    numeric lng "nullable"
-    boolean active
-  }
-  professions {
-    uuid id PK
-    varchar name "único sin mayúsculas"
-    varchar slug UK
-    boolean active
-  }
-  subscription_plans {
-    uuid id PK
-    varchar code UK "BASIC MEDIUM PREMIUM"
     varchar name
-    numeric price_amount
-    char currency
-    smallint max_professions
-    smallint max_images
-    smallint max_videos
-    smallint max_video_seconds
-    theme_level theme_level "NONE STANDARD EXTENDED"
-    smallint ranking_tier
-    boolean availability_alerts
-    boolean custom_alert_message
-    boolean metrics_enabled
-    boolean chatbot_enabled
-    boolean active
+    varchar normalized_name "único por localidad"
+    neighborhood_status status "PENDING APPROVED MERGED"
+    uuid merged_into_id FK
+    uuid created_by_user_id FK
+    uuid reviewed_by_id FK
   }
-  admin_audit_logs {
+  auth_sessions {
+    uuid id PK "sid"
+    uuid user_id FK
+    uuid family_id "dispositivo"
+    char refresh_token_hash UK
+    timestamptz expires_at
+    timestamptz family_expires_at
+    timestamptz revoked_at
+    session_revoke_reason revoke_reason
+  }
+  one_time_tokens {
     uuid id PK
-    uuid actor_id "FK a users desde la etapa 5"
-    varchar action
-    varchar target_type
-    uuid target_id
-    text reason
-    jsonb metadata "sin datos sensibles"
-    audit_result result "SUCCESS DENIED FAILED"
-    varchar ip_hash
-    timestamptz created_at
+    uuid user_id FK
+    one_time_token_type type "EMAIL_VERIFY PASSWORD_RESET"
+    char token_hash UK
+    timestamptz expires_at
+    timestamptz used_at
+  }
+  user_mfa_settings {
+    uuid user_id PK
+    text totp_secret_encrypted
+    jsonb recovery_code_hashes
+    bigint last_used_step
+  }
+  professional_service_areas {
+    uuid id PK
+    uuid professional_id FK
+    uuid locality_id FK
+    uuid neighborhood_id FK
   }
 ```
 
+Las tablas de la etapa 4 (`provinces`, `localities`, `professions`, `subscription_plans`,
+`admin_audit_logs`) mantienen las columnas descritas abajo.
+
 ## Tablas
 
-| Tabla                                      | Para qué                                             | Integridad en la base                                                                                                 |
-| ------------------------------------------ | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `provinces`, `localities`, `neighborhoods` | Ubicación declarada de usuarios y zonas de cobertura | Únicos por nombre sin mayúsculas dentro del padre; FK `RESTRICT`; coordenadas ambas o ninguna, en rango               |
-| `professions`                              | Catálogo único de oficios (lo administra el admin)   | `slug` único con formato `minúsculas-con-guiones`; nombre único sin mayúsculas                                        |
-| `subscription_plans`                       | **Única fuente** de precios y límites de plan        | `code` único; precio ≥ 0; moneda de 3 letras mayúsculas; límites no negativos y al menos 1 profesión                  |
-| `admin_audit_logs`                         | Acciones administrativas y eventos de seguridad      | **Append-only**: un trigger rechaza `UPDATE`, `DELETE` y `TRUNCATE`; el rol de runtime solo tiene `SELECT` e `INSERT` |
+| Tabla                        | Para qué                                                 | Integridad en la base                                                                                                           |
+| ---------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `provinces`, `localities`    | Ubicaciones que habilita el admin                        | Únicos por nombre sin mayúsculas; FK `RESTRICT`; coordenadas ambas o ninguna, en rango                                          |
+| `neighborhoods`              | Barrios creados por los usuarios (ADR 0010)              | Nombre normalizado único por localidad (incluye alias fusionados); `merged_into_id` si y solo si `MERGED`; no apunta a sí mismo |
+| `professions`                | Catálogo único de oficios (lo administra el admin)       | `slug` único con formato `minúsculas-con-guiones`; nombre único sin mayúsculas                                                  |
+| `subscription_plans`         | **Única fuente** de precios y límites de plan            | `code` único; precio ≥ 0; moneda de 3 letras mayúsculas; límites no negativos y al menos 1 profesión                            |
+| `users`                      | Identidad y credenciales                                 | Email único entre no borrados (`citext`); intentos fallidos ≥ 0; un cliente tiene barrio                                        |
+| `auth_sessions`              | Una fila por refresh token; la familia es el dispositivo | Hash único; `replaced_by_id` encadena las rotaciones                                                                            |
+| `one_time_tokens`            | Enlaces de un solo uso                                   | Hash único; el consumo es un `UPDATE … WHERE used_at IS NULL AND expires_at > now()` atómico                                    |
+| `user_mfa_settings`          | TOTP del admin                                           | Uno por usuario                                                                                                                 |
+| `professional_profiles`      | Perfil profesional (mínimo hasta la etapa 7)             | Uno por usuario                                                                                                                 |
+| `professional_professions`   | Oficios del profesional                                  | Una sola principal por profesional (índice parcial)                                                                             |
+| `professional_service_areas` | Zonas de trabajo (1 a 20)                                | El barrio pertenece a la localidad (FK compuesta); sin zonas repetidas (`NULLS NOT DISTINCT`)                                   |
+| `admin_audit_logs`           | Acciones administrativas y eventos de seguridad          | **Append-only**: un trigger rechaza `UPDATE`, `DELETE` y `TRUNCATE`; el rol de runtime solo tiene `SELECT` e `INSERT`           |
+
+Eventos auditados hoy: `USER_REGISTERED`, `ACCOUNT_LOCKED`, `REFRESH_TOKEN_REUSE`, `ADMIN_LOGIN`,
+`ADMIN_LOGIN_RECOVERY_CODE`, `ADMIN_PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET_COMPLETED`,
+`PASSWORD_CHANGED`, `ADMIN_CREATED`.
 
 ## Datos iniciales (`npm run seed:catalogs`)
 
 Idempotente (`ON CONFLICT DO NOTHING`): no duplica y **no pisa** cambios del admin.
 
-| Catálogo    | Contenido                                                                   | Estado                                                          |
-| ----------- | --------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| Ubicaciones | Córdoba → Córdoba (capital) → 8 barrios                                     | **De ejemplo**, sin coordenadas. Falta fuente oficial           |
-| Oficios     | 10 oficios comunes                                                          | **De ejemplo**; el catálogo final lo define el admin            |
-| Planes      | Basic $10.000 · Medium $15.000 · Premium $20.000 (ARS, impuestos incluidos) | Precios de referencia a confirmar. Límites en la tabla de abajo |
+| Catálogo    | Contenido                                                                       | Estado                                                          |
+| ----------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Ubicaciones | Córdoba → Córdoba (capital). **Sin barrios**: los crean los usuarios (ADR 0010) | Sin coordenadas. Faltan las demás localidades                   |
+| Oficios     | 10 oficios comunes                                                              | **De ejemplo**; el catálogo final lo define el admin            |
+| Planes      | Basic $10.000 · Medium $15.000 · Premium $20.000 (ARS, impuestos incluidos)     | Precios de referencia a confirmar. Límites en la tabla de abajo |
 
 | Límite                   | Basic  | Medium             | Premium                |
 | ------------------------ | ------ | ------------------ | ---------------------- |
@@ -118,10 +144,10 @@ Idempotente (`ON CONFLICT DO NOTHING`): no duplica y **no pisa** cambios del adm
 
 ## Roles de base de datos
 
-| Rol                           | Uso                                             | Permisos                                                                                                        |
-| ----------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Dueño (`nexo` en local)       | Migraciones y seeds (`DATABASE_MIGRATIONS_URL`) | DDL sobre el esquema                                                                                            |
-| Runtime (`nexo_app` en local) | La API (`DATABASE_URL`)                         | `SELECT/INSERT/UPDATE/DELETE` sobre las tablas; nada de DDL ni `TRUNCATE`; solo `SELECT/INSERT` en la auditoría |
+| Rol                           | Uso                                                             | Permisos                                                                                                        |
+| ----------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Dueño (`nexo` en local)       | Migraciones, seeds y `admin:create` (`DATABASE_MIGRATIONS_URL`) | DDL sobre el esquema                                                                                            |
+| Runtime (`nexo_app` en local) | La API (`DATABASE_URL`)                                         | `SELECT/INSERT/UPDATE/DELETE` sobre las tablas; nada de DDL ni `TRUNCATE`; solo `SELECT/INSERT` en la auditoría |
 
 En local los crea `docker/postgres/init/`. En Railway hay que crear el rol de runtime a mano si el plan
 lo permite (ver `docs/env.md`); aunque no se pueda, el trigger mantiene la auditoría append-only.

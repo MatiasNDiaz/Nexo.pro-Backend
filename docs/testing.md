@@ -1,10 +1,10 @@
 # Pruebas
 
-| Tipo        | Ubicación                        | Comando            | Base de datos | Qué cubre hoy                                                                                                                                                                      |
-| ----------- | -------------------------------- | ------------------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unitarias   | `src/**/*.spec.ts`               | `npm test`         | No            | Validación del entorno, filtro de errores (incluye errores de PostgreSQL), ValidationPipe, redacción del logger, health, naming strategy, lista de migraciones, saneo de auditoría |
-| Integración | `test/integration/*.int-spec.ts` | `npm run test:int` | Sí            | Entidades = esquema real, migraciones up/down desde cero, auditoría append-only, seed idempotente, constraints                                                                     |
-| E2E         | `test/*.e2e-spec.ts`             | `npm run test:e2e` | Sí            | App real con Supertest: health live/ready, prefijo/versión, Helmet, CORS, 404/413/400, rate limit 429, arranque con entorno inválido                                               |
+| Tipo        | Ubicación                        | Comando            | Base de datos | Qué cubre hoy                                                                                                                                                                                                               |
+| ----------- | -------------------------------- | ------------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unitarias   | `src/**/*.spec.ts`               | `npm test`         | No            | Validación del entorno, filtro de errores, ValidationPipe, redacción del logger, health, naming strategy, migraciones, auditoría, cifrado, nombres de barrios, guards, cookies de producción, CSRF, bloqueo progresivo, MFA |
+| Integración | `test/integration/*.int-spec.ts` | `npm run test:int` | Sí            | Entidades = esquema real, migraciones up/down desde cero, auditoría append-only, seed idempotente, constraints                                                                                                              |
+| E2E         | `test/*.e2e-spec.ts`             | `npm run test:e2e` | Sí            | App real con Supertest y cookies reales: los casos del plan §9.10, registro y barrios, MFA del admin, reset por admin, health, CORS, errores, rate limit                                                                    |
 
 Los tests corren con `node --experimental-vm-modules` porque los paquetes de NestJS 12 son ESM (ver ADR 0004). Para ocultar el aviso experimental: `NODE_OPTIONS=--no-warnings=ExperimentalWarning`.
 
@@ -14,6 +14,19 @@ Los tests corren con `node --experimental-vm-modules` porque los paquetes de Nes
 - Por seguridad, se niega a correr si `NODE_ENV` no es `test` o si el nombre de la base no termina en `_test`.
 - En tu máquina: `docker compose up -d postgres` y `.env.test.local` con la URL de `nexo_test` (ver `docs/env.md`). En la CI, un servicio PostgreSQL efímero.
 - Cada test que modifica datos usa una transacción que se revierte, o deja la base como la encontró.
+
+## E2E de autenticación
+
+- `test/utils/auth-client.ts` define `Client`: un "navegador" con su propio cookie jar, `Origin` y
+  `X-Requested-With` por defecto y el token CSRF guardado en memoria, como el frontend.
+- Cada `Client` simula su propia IP (`X-Forwarded-For`, con `TRUST_PROXY=1` en `.env.test`), así los
+  límites por IP de login y registro no se mezclan entre tests. El test de rate limit reusa una IP.
+- Los emails van al `MemoryMailProvider` (`MAIL_PROVIDER=memory`); `lastMailToken()` saca el token
+  del último enlace enviado a una dirección.
+- `createAdmin()` crea un admin con TOTP directo en la base (en producción, `npm run admin:create`).
+
+Cobertura del plan §9.10: casos 1 a 14 en `auth.e2e-spec.ts` y `admin-auth.e2e-spec.ts`. El caso 15
+(cambio de rol o suspensión por el admin revoca sesiones) necesita los endpoints de la etapa 6.
 
 ## Reglas
 

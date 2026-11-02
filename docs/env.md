@@ -35,6 +35,33 @@ La app, la CLI de migraciones y los tests leen `.env.<NODE_ENV>.local` y despué
 | `DB_SSL`                  | No          | `false`        | TLS hacia PostgreSQL (verifica el certificado). En la red privada de Railway no hace falta                            |
 | `DB_POOL_MAX`             | No          | `10`           | Conexiones máximas del pool                                                                                           |
 
+## Variables de autenticación (etapa 5)
+
+Secretos: generalos con `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
+(para `DATA_ENCRYPTION_KEY`, `randomBytes(32)`). Uno distinto por ambiente; nunca en el repo.
+
+| Variable                               | Obligatoria | Defecto                         | Descripción                                                                                                             |
+| -------------------------------------- | ----------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `FRONTEND_URL`                         | Sí          | —                               | Base de los enlaces de los emails. En producción, `https`                                                               |
+| `JWT_ACCESS_SECRET`                    | Sí          | —                               | Secreto HS256 del access token (≥ 64 caracteres)                                                                        |
+| `JWT_ACCESS_SECRET_PREVIOUS`           | No          | —                               | Secreto anterior durante una rotación: se acepta para verificar, no para firmar                                         |
+| `JWT_ISSUER` / `JWT_AUDIENCE`          | No          | `nexo-api` / `nexo-web`         | Claims `iss` y `aud`                                                                                                    |
+| `ACCESS_TOKEN_TTL_SEC` / `ADMIN_…`     | No          | `600` / `300`                   | Vida del access token (ADR 0008)                                                                                        |
+| `REFRESH_IDLE_TTL_SEC` / `ADMIN_…`     | No          | 14 días / 12 h                  | Vencimiento por inactividad                                                                                             |
+| `REFRESH_ABSOLUTE_TTL_SEC` / `ADMIN_…` | No          | 30 días / 7 días                | Vida máxima de la sesión                                                                                                |
+| `COOKIE_SECURE`                        | No          | `false`                         | `Secure` + prefijos `__Host-`/`__Secure-`. **Obligatorio `true` en producción**                                         |
+| `CSRF_SECRET`                          | Sí          | —                               | HMAC del token CSRF (≥ 32 caracteres)                                                                                   |
+| `DATA_ENCRYPTION_KEY`                  | Sí          | —                               | AES-256-GCM (64 caracteres hex). Cifra el secreto TOTP del admin                                                        |
+| `DATA_ENCRYPTION_KEY_VERSION`          | No          | `1`                             | Versión de la clave (para rotarla)                                                                                      |
+| `DATA_HMAC_KEY`                        | Sí          | —                               | Seudonimiza datos (IP de las sesiones). ≥ 32 caracteres                                                                 |
+| `PASSWORD_SELF_RESET_ENABLED`          | No          | `false`                         | "Olvidé mi contraseña" autoservicio (ADR 0002: apagado)                                                                 |
+| `MAIL_PROVIDER`                        | No          | `console`                       | `console` (desarrollo) o `memory` (tests). **En producción ninguno de los dos es válido**: hace falta un proveedor real |
+| `MAIL_FROM`                            | No          | `Nexo PRO <no-reply@localhost>` | Remitente                                                                                                               |
+| `MAX_SERVICE_AREAS`                    | No          | `20`                            | Zonas de trabajo por profesional (ADR 0010)                                                                             |
+
+En `.env.test` estas variables tienen valores fijos de prueba (públicos en el repo: no sirven para
+otro ambiente) y `TRUST_PROXY=1`, para que cada cliente de los e2e simule su propia IP.
+
 ## Docker Compose (`.env`)
 
 | Variable                | Defecto         | Descripción                                                       |
@@ -55,4 +82,5 @@ El script `docker/postgres/init/` solo corre con el volumen vacío. Si cambiás 
 
 ## Próximas etapas
 
-Se agregan con su etapa y se documentan acá: JWT, cookies, CSRF, `FRONTEND_URL` y claves de cifrado/HMAC (5); almacenamiento, email, pagos e identidad (7 y 9). Lista propuesta: plan §15.2.
+Se agregan con su etapa y se documentan acá: almacenamiento e identidad (7), proveedor real de email,
+pagos (9). Lista propuesta: plan §15.2.
