@@ -23,7 +23,11 @@ import { AccountStatus, UserRole, VerificationStatus } from '../user.enums';
 @Index('uq_users_email', { synchronize: false })
 @Index(['neighborhoodId'])
 @Check('ck_users_failed_login_attempts', 'failed_login_attempts >= 0')
-@Check('ck_users_customer_neighborhood', "role <> 'CUSTOMER' OR neighborhood_id IS NOT NULL")
+// Las cuentas borradas se anonimizan (ADR 0013) y pierden el barrio.
+@Check(
+  'ck_users_customer_neighborhood',
+  "role <> 'CUSTOMER' OR neighborhood_id IS NOT NULL OR deleted_at IS NOT NULL",
+)
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -45,6 +49,10 @@ export class User {
     default: AccountStatus.PENDING_VERIFICATION,
   })
   status: AccountStatus;
+
+  /** Motivo de la suspensión o el baneo; el usuario lo ve en /auth/me (ADR 0007). */
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  statusReason: string | null;
 
   @Column({
     type: 'enum',

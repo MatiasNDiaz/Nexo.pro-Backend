@@ -4,14 +4,11 @@ import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import { AUDIT_LOGGER, type AuditLogger } from '../../audit/audit-logger';
 import { type AuthConfig, authConfig } from '../../config/auth.config';
 import { NeighborhoodsService } from '../../locations/neighborhoods.service';
-import { ProfessionalProfession } from '../../professionals/entities/professional-profession.entity';
-import { ProfessionalProfile } from '../../professionals/entities/professional-profile.entity';
-import { ProfessionalServiceArea } from '../../professionals/entities/professional-service-area.entity';
-import { Profession } from '../../professions/entities/profession.entity';
+import { ProfessionalsService } from '../../professionals/professionals.service';
 import { User } from '../../users/entities/user.entity';
 import { AccountStatus, UserRole } from '../../users/user.enums';
 import { AuthEvents, TokenMailEvent } from '../auth.events';
-import { RegisterDto, ServiceAreaInputDto } from '../dto/register.dto';
+import { RegisterDto } from '../dto/register.dto';
 import { OneTimeTokenType } from '../entities/one-time-token.entity';
 import { OneTimeTokensService } from './one-time-tokens.service';
 import { PasswordService } from './password.service';
@@ -34,6 +31,7 @@ export class RegistrationService {
     private readonly passwords: PasswordService,
     private readonly oneTimeTokens: OneTimeTokensService,
     private readonly neighborhoods: NeighborhoodsService,
+    private readonly professionals: ProfessionalsService,
     private readonly events: EventEmitter2,
     @Inject(authConfig.KEY) private readonly config: AuthConfig,
     @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
@@ -101,7 +99,14 @@ export class RegistrationService {
     await users.insert(user);
 
     if (dto.role === UserRole.PROFESSIONAL) {
-      createdNeighborhoods.push(...(await this.createProfessional(manager, user, dto)));
+      createdNeighborhoods.push(
+        ...(await this.professionals.createProfile(
+          manager,
+          user.id,
+          dto.professionId,
+          dto.serviceAreas ?? [],
+        )),
+      );
     }
     for (const id of createdNeighborhoods)
       await this.neighborhoods.setCreator(manager, id, user.id);
@@ -125,72 +130,6 @@ export class RegistrationService {
       manager,
     );
     return { kind: 'CREATED', user, token };
-  }
-
-  /** Perfil mínimo + profesión principal + zonas de trabajo. Devuelve los barrios creados. */
-  private async createProfessional(
-    manager: EntityManager,
-    user: User,
-    dto: RegisterDto,
-  ): Promise<string[]> {
-    const profession = await manager
-      .getRepository(Profession)
-      .findOneBy({ id: dto.professionId, active: true });
-    if (!profession) {
-      throw new BadRequestException({
-        code: 'INVALID_PROFESSION',
-        message: 'La profesión no existe.',
-      });
-    }
-    const profile = manager.getRepository(ProfessionalProfile).create({ userId: user.id });
-    await manager.getRepository(ProfessionalProfile).insert(profile);
-    await manager.getRepository(ProfessionalProfession).insert({
-      professionalId: profile.id,
-      professionId: profession.id,
-      isPrimary: true,
-    });
-
-    const { zones, created } = await this.resolveServiceAreas(manager, dto.serviceAreas ?? []);
-    await manager
-      .getRepository(ProfessionalServiceArea)
-      .insert(zones.map((zone) => ({ professionalId: profile.id, ...zone })));
-    return created;
-  }
-
-  /**
-   * Resuelve las zonas (ADR 0010): sin repetidas y, si una localidad se cubre completa, se descartan
-   * sus barrios sueltos. Entre 1 y MAX_SERVICE_AREAS zonas.
-   */
-  private async resolveServiceAreas(manager: EntityManager, input: ServiceAreaInputDto[]) {
-    const wholeLocalities = new Set(
-      input.filter((area) => !area.neighborhoodName).map((area) => area.localityId),
-    );
-    const zones = new Map<string, { localityId: string; neighborhoodId: string | null }>();
-    const created: string[] = [];
-    for (const localityId of wholeLocalities) {
-      await this.neighborhoods.assertLocality(manager, localityId);
-      zones.set(`${localityId}:*`, { localityId, neighborhoodId: null });
-    }
-    for (const area of input) {
-      if (!area.neighborhoodName || wholeLocalities.has(area.localityId)) continue;
-      const resolved = await this.neighborhoods.resolve(
-        manager,
-        area.localityId,
-        area.neighborhoodName,
-      );
-      zones.set(`${area.localityId}:${resolved.neighborhood.id}`, {
-        localityId: area.localityId,
-        neighborhoodId: resolved.neighborhood.id,
-      });
-      if (resolved.created) created.push(resolved.neighborhood.id);
-    }
-    if (zones.size === 0 || zones.size > this.config.maxServiceAreas) {
-      throw new BadRequestException({
-        code: 'INVALID_SERVICE_AREAS',
-        message: `Elegí entre 1 y ${this.config.maxServiceAreas} zonas de trabajo.`,
-      });
-    }
-    return { zones: [...zones.values()], created };
   }
 
   /** Cada rol manda solo sus datos: nada de mezclar barrio de cliente con zonas de profesional. */

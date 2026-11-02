@@ -10,6 +10,12 @@ export class CurrentUserDto {
   @ApiProperty() lastName: string;
   @ApiProperty({ enum: UserRole }) role: UserRole;
   @ApiProperty({ enum: AccountStatus }) status: AccountStatus;
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description: 'Motivo, solo si la cuenta está suspendida o baneada (ADR 0007)',
+  })
+  statusReason: string | null;
   @ApiProperty({ enum: VerificationStatus }) verificationStatus: VerificationStatus;
   @ApiProperty() emailVerified: boolean;
   @ApiProperty() createdAt: Date;
@@ -22,6 +28,10 @@ export class CurrentUserDto {
       lastName: user.lastName,
       role: user.role,
       status: user.status,
+      statusReason:
+        user.status === AccountStatus.SUSPENDED || user.status === AccountStatus.BANNED
+          ? user.statusReason
+          : null,
       verificationStatus: user.verificationStatus,
       emailVerified: user.emailVerifiedAt !== null,
       createdAt: user.createdAt,

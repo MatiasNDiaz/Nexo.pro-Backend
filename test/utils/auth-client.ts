@@ -158,6 +158,31 @@ export async function createAdmin(app: NestExpressApplication) {
   };
 }
 
+/** Admin con sesión completa (contraseña + TOTP) y el token CSRF cargado. */
+export async function signInAdmin(app: NestExpressApplication) {
+  const admin = await createAdmin(app);
+  const client = new Client(app);
+  await client.login(admin.email, admin.password);
+  const res = await client.post('/auth/mfa/verify', { code: await admin.totp() });
+  if (res.status !== 200) throw new Error(`MFA falló: ${res.status}`);
+  client.csrfToken = (res.body as { csrfToken: string }).csrfToken;
+  return { admin, client };
+}
+
+/** Cliente registrado, en el estado pedido y con sesión iniciada. */
+export async function signInCustomer(
+  app: NestExpressApplication,
+  status: AccountStatus = AccountStatus.ACTIVE,
+) {
+  const email = await registerCustomer(app);
+  await setStatus(app.get(DataSource), email, status);
+  const client = new Client(app);
+  const res = await client.login(email);
+  if (res.status !== 200) throw new Error(`Login falló: ${res.status}`);
+  const me = await client.get('/auth/me');
+  return { client, email, id: (me.body as { id: string }).id };
+}
+
 /** Parsea los Set-Cookie de una respuesta: nombre → atributos (en minúsculas). */
 export function parseSetCookies(header: string[] | string | undefined) {
   const list = Array.isArray(header) ? header : header ? [header] : [];

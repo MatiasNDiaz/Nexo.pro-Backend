@@ -27,6 +27,10 @@ export class ProfessionalProfile {
   @JoinColumn({ name: 'user_id' })
   user?: Relation<User>;
 
+  /** Perfil inactivo: el usuario cambió de rol (ADR 0012) o dio de baja la cuenta. No se borra. */
+  @Column({ type: 'timestamptz', nullable: true })
+  deactivatedAt: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

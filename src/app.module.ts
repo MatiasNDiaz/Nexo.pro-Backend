@@ -25,6 +25,7 @@ import { HealthModule } from './health/health.module';
 import { MailModule } from './integrations/mail/mail.module';
 import { LocationsModule } from './locations/locations.module';
 import { ProfessionsModule } from './professions/professions.module';
+import { UsersModule } from './users/users.module';
 
 const nodeEnv = process.env.NODE_ENV ?? 'development';
 
@@ -62,6 +63,7 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
     LocationsModule,
     ProfessionsModule,
     AuthModule,
+    UsersModule,
   ],
   providers: [
     // Guards globales, en este orden (plan §9.8). Denegación por defecto: solo `@Public()` pasa

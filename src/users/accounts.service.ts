@@ -1,0 +1,277 @@
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { DataSource, EntityManager } from 'typeorm';
+import { AUDIT_LOGGER, type AuditLogger } from '../audit/audit-logger';
+import { SessionRevokeReason } from '../auth/entities/auth-session.entity';
+import { OneTimeToken } from '../auth/entities/one-time-token.entity';
+import { UserMfaSettings } from '../auth/entities/user-mfa-settings.entity';
+import { PasswordService } from '../auth/services/password.service';
+import { SessionsService } from '../auth/services/sessions.service';
+import type { AuthUser } from '../common/decorators';
+import { NeighborhoodsService } from '../locations/neighborhoods.service';
+import { ProfessionalsService } from '../professionals/professionals.service';
+import { ChangeRoleDto } from './dto/account-admin.dto';
+import { User } from './entities/user.entity';
+import { AccountStatus, UserRole, VerificationStatus } from './user.enums';
+
+/** Una cuenta que no se puede llevar a ese estado desde el actual. */
+const invalidTransition = (from: AccountStatus, action: string) =>
+  new ConflictException({
+    code: 'INVALID_STATE_TRANSITION',
+    message: `No se puede ${action} una cuenta en estado ${from}.`,
+  });
+
+/**
+ * Ciclo de vida de la cuenta (etapa 6, ADR 0007, 0012, 0013 y 0014). Cada acción del admin:
+ * bloquea la fila del usuario, valida la transición, revoca las sesiones cuando corresponde y
+ * audita con motivo, todo en una transacción. El admin no puede aplicarlas sobre una cuenta ADMIN.
+ */
+@Injectable()
+export class AccountsService {
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly sessions: SessionsService,
+    private readonly passwords: PasswordService,
+    private readonly neighborhoods: NeighborhoodsService,
+    private readonly professionals: ProfessionalsService,
+    @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
+  ) {}
+
+  suspend(admin: AuthUser, userId: string, reason: string): Promise<User> {
+    return this.changeStatus(admin, userId, reason, {
+      action: 'ACCOUNT_SUSPENDED',
+      verb: 'suspender',
+      from: [AccountStatus.ACTIVE, AccountStatus.PENDING_VERIFICATION],
+      to: () => AccountStatus.SUSPENDED,
+      revoke: true,
+    });
+  }
+
+  ban(admin: AuthUser, userId: string, reason: string): Promise<User> {
+    return this.changeStatus(admin, userId, reason, {
+      action: 'ACCOUNT_BANNED',
+      verb: 'banear',
+      from: [AccountStatus.ACTIVE, AccountStatus.PENDING_VERIFICATION, AccountStatus.SUSPENDED],
+      to: () => AccountStatus.BANNED,
+      revoke: true,
+    });
+  }
+
+  /** Levanta una suspensión o un baneo. Vuelve a ACTIVE solo si la identidad está aprobada. */
+  restore(admin: AuthUser, userId: string, reason: string): Promise<User> {
+    return this.changeStatus(admin, userId, reason, {
+      action: 'ACCOUNT_RESTORED',
+      verb: 'restaurar',
+      from: [AccountStatus.SUSPENDED, AccountStatus.BANNED],
+      to: (user) =>
+        user.verificationStatus === VerificationStatus.APPROVED
+          ? AccountStatus.ACTIVE
+          : AccountStatus.PENDING_VERIFICATION,
+      revoke: false,
+    });
+  }
+
+  /** Cuenta comprometida (ADR 0014): cierra todos los dispositivos sin cambiar el estado. */
+  async revokeSessions(admin: AuthUser, userId: string, reason: string): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      const user = await this.lockTarget(manager, userId);
+      await this.sessions.revokeAllForUser(user.id, SessionRevokeReason.ADMIN_REVOKED, { manager });
+      await this.record(manager, admin.id, 'SESSIONS_REVOKED', user.id, reason);
+    });
+  }
+
+  /**
+   * Cambio de rol (ADR 0012): el perfil anterior queda inactivo (no se borra) y las sesiones se
+   * revocan para que el nuevo rol rija desde el próximo login.
+   */
+  async changeRole(admin: AuthUser, userId: string, dto: ChangeRoleDto): Promise<User> {
+    return this.dataSource.transaction(async (manager) => {
+      const user = await this.lockTarget(manager, userId);
+      if (user.role === dto.role) {
+        throw new ConflictException({ code: 'SAME_ROLE', message: `La cuenta ya es ${dto.role}.` });
+      }
+      const from = user.role;
+      const createdNeighborhoods =
+        dto.role === UserRole.CUSTOMER
+          ? await this.becomeCustomer(manager, user, dto)
+          : await this.becomeProfessional(manager, user, dto);
+      for (const id of createdNeighborhoods)
+        await this.neighborhoods.setCreator(manager, id, admin.id);
+
+      await manager.getRepository(User).update(user.id, { role: dto.role });
+      await this.sessions.revokeAllForUser(user.id, SessionRevokeReason.ROLE_CHANGED, { manager });
+      await this.record(manager, admin.id, 'ROLE_CHANGED', user.id, dto.reason, {
+        from,
+        to: dto.role,
+      });
+      return manager.getRepository(User).findOneByOrFail({ id: user.id });
+    });
+  }
+
+  /** Baja por el admin (ADR 0013). */
+  async deleteByAdmin(admin: AuthUser, userId: string, reason: string): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      const user = await this.lockTarget(manager, userId);
+      await this.anonymize(manager, user);
+      await this.record(manager, admin.id, 'ACCOUNT_DELETED', user.id, reason, { by: 'ADMIN' });
+    });
+  }
+
+  /** Baja de la propia cuenta: exige la contraseña. El admin no puede darse de baja así. */
+  async deleteOwn(authUser: AuthUser, password: string): Promise<void> {
+    if (authUser.role === UserRole.ADMIN) {
+      throw new ForbiddenException({
+        code: 'ADMIN_CANNOT_SELF_DELETE',
+        message: 'La cuenta del admin no se puede dar de baja desde la API.',
+      });
+    }
+    const withPassword = await this.dataSource
+      .getRepository(User)
+      .createQueryBuilder('u')
+      .addSelect('u.passwordHash')
+      .where('u.id = :id', { id: authUser.id })
+      .getOneOrFail();
+    if (!(await this.passwords.verify(withPassword.passwordHash, password))) {
+      throw new BadRequestException({
+        code: 'INVALID_CURRENT_PASSWORD',
+        message: 'La contraseña no es correcta.',
+      });
+    }
+    await this.dataSource.transaction(async (manager) => {
+      const user = await this.lockTarget(manager, authUser.id);
+      await this.anonymize(manager, user);
+      await this.record(manager, user.id, 'ACCOUNT_DELETED', user.id, null, { by: 'SELF' });
+    });
+  }
+
+  private async changeStatus(
+    admin: AuthUser,
+    userId: string,
+    reason: string,
+    rule: {
+      action: string;
+      verb: string;
+      from: AccountStatus[];
+      to: (user: User) => AccountStatus;
+      revoke: boolean;
+    },
+  ): Promise<User> {
+    return this.dataSource.transaction(async (manager) => {
+      const user = await this.lockTarget(manager, userId);
+      if (!rule.from.includes(user.status)) throw invalidTransition(user.status, rule.verb);
+      const status = rule.to(user);
+      const restricted = status === AccountStatus.SUSPENDED || status === AccountStatus.BANNED;
+      await manager
+        .getRepository(User)
+        .update(user.id, { status, statusReason: restricted ? reason : null });
+      if (rule.revoke) {
+        await this.sessions.revokeAllForUser(user.id, SessionRevokeReason.ACCOUNT_SUSPENDED, {
+          manager,
+        });
+      }
+      await this.record(manager, admin.id, rule.action, user.id, reason, {
+        from: user.status,
+        to: status,
+      });
+      return manager.getRepository(User).findOneByOrFail({ id: user.id });
+    });
+  }
+
+  private async becomeCustomer(manager: EntityManager, user: User, dto: ChangeRoleDto) {
+    const created: string[] = [];
+    if (dto.neighborhood) {
+      const resolved = await this.neighborhoods.resolve(
+        manager,
+        dto.neighborhood.localityId,
+        dto.neighborhood.name,
+      );
+      await manager
+        .getRepository(User)
+        .update(user.id, { neighborhoodId: resolved.neighborhood.id });
+      if (resolved.created) created.push(resolved.neighborhood.id);
+    } else if (!user.neighborhoodId) {
+      throw new BadRequestException({
+        code: 'NEIGHBORHOOD_REQUIRED',
+        message: 'Para pasar a cliente hace falta el barrio donde vive.',
+      });
+    }
+    await this.professionals.deactivate(manager, user.id);
+    return created;
+  }
+
+  private async becomeProfessional(manager: EntityManager, user: User, dto: ChangeRoleDto) {
+    const previous = await this.professionals.reactivate(manager, user.id);
+    if (previous) {
+      return dto.serviceAreas
+        ? this.professionals.replaceServiceAreas(manager, previous.id, dto.serviceAreas)
+        : [];
+    }
+    if (!dto.professionId || !dto.serviceAreas) {
+      throw new BadRequestException({
+        code: 'PROFESSIONAL_DATA_REQUIRED',
+        message: 'Para pasar a profesional hacen falta la profesión y las zonas de trabajo.',
+      });
+    }
+    return this.professionals.createProfile(manager, user.id, dto.professionId, dto.serviceAreas);
+  }
+
+  /**
+   * Anonimiza la cuenta (ADR 0013): borra los datos personales y deja una cuenta inutilizable.
+   * Se conservan el id (seudónimo) y los registros que lo referencian: pagos, reportes, auditoría.
+   */
+  private async anonymize(manager: EntityManager, user: User): Promise<void> {
+    await manager.getRepository(User).update(user.id, {
+      email: `deleted-${user.id}@deleted.invalid`,
+      firstName: 'Cuenta',
+      lastName: 'eliminada',
+      phone: '',
+      // Hash imposible de satisfacer: ninguna contraseña lo verifica.
+      passwordHash: '!',
+      neighborhoodId: null,
+      status: AccountStatus.DEACTIVATED,
+      statusReason: null,
+      emailVerifiedAt: null,
+      lockedUntil: null,
+      deletedAt: new Date(),
+    });
+    await manager.getRepository(UserMfaSettings).delete({ userId: user.id });
+    await manager.getRepository(OneTimeToken).delete({ userId: user.id });
+    await this.professionals.deactivate(manager, user.id);
+    await this.sessions.revokeAllForUser(user.id, SessionRevokeReason.ACCOUNT_DELETED, { manager });
+  }
+
+  /** Bloquea la fila (serializa acciones simultáneas) y rechaza cuentas borradas o de admin. */
+  private async lockTarget(manager: EntityManager, userId: string): Promise<User> {
+    const user = await manager
+      .getRepository(User)
+      .findOne({ where: { id: userId }, lock: { mode: 'pessimistic_write' } });
+    if (!user) throw new NotFoundException();
+    if (user.role === UserRole.ADMIN) {
+      throw new ConflictException({
+        code: 'CANNOT_MODIFY_ADMIN',
+        message: 'Esta acción no se puede aplicar a una cuenta de administrador.',
+      });
+    }
+    return user;
+  }
+
+  private record(
+    manager: EntityManager,
+    actorId: string,
+    action: string,
+    targetId: string,
+    reason: string | null,
+    metadata: Record<string, string> = {},
+  ): Promise<void> {
+    return this.audit.record(
+      { actorId, action, targetType: 'USER', targetId, reason, result: 'SUCCESS', metadata },
+      manager,
+    );
+  }
+}

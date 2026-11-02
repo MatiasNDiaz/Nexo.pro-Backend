@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { LocationsModule } from '../locations/locations.module';
+import { ProfessionalsModule } from '../professionals/professionals.module';
 import { AdminAuthController } from './admin-auth.controller';
 import { AuthMailListener } from './auth-mail.listener';
 import { AuthController } from './auth.controller';
@@ -18,7 +19,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   // Sin opciones globales en JwtModule: cada firma/verificación pasa secreto y algoritmo explícitos.
-  imports: [PassportModule, JwtModule.register({}), LocationsModule],
+  imports: [PassportModule, JwtModule.register({}), LocationsModule, ProfessionalsModule],
   controllers: [AuthController, AdminAuthController],
   providers: [
     AuthService,
@@ -33,6 +34,6 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     JwtStrategy,
     AuthMailListener,
   ],
-  exports: [CsrfService, SessionsService],
+  exports: [CsrfService, SessionsService, PasswordService, AuthCookiesService],
 })
 export class AuthModule {}
