@@ -39,17 +39,17 @@ NestJS 12 · TypeORM 1.x · PostgreSQL 17 · Node 26. La consume un frontend Nex
 
 ## Comandos
 
-| Comando                                                               | Qué hace                                                               |
-| --------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `npm run start:dev`                                                   | API con recarga automática                                             |
-| `npm run build` / `npm run start:prod`                                | Compila a `dist/` / ejecuta lo compilado                               |
-| `npm run lint` · `npm run format:check` · `npm run typecheck`         | Calidad                                                                |
-| `npm test` · `npm run test:int` · `npm run test:e2e`                  | Pruebas (ver `docs/testing.md`)                                        |
-| `npm run migration:run` · `migration:revert` · `migration:show`       | Migraciones (compila y usa la CLI de TypeORM)                          |
-| `npm run migration:create -- src/database/migrations/NombreDelCambio` | Crea una migración vacía (después registrala en `migrations/index.ts`) |
-| `npm run seed:catalogs`                                               | Ubicaciones, oficios y planes (idempotente)                            |
-| `npm run admin:create -- --email …`                                   | Crea el único admin con segundo factor TOTP                            |
-| `npm run accounts:purge`                                              | Anonimiza las cuentas dadas de baja con la gracia vencida (diario)     |
+| Comando                                                               | Qué hace                                                                      |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `npm run start:dev`                                                   | API con recarga automática                                                    |
+| `npm run build` / `npm run start:prod`                                | Compila a `dist/` / ejecuta lo compilado                                      |
+| `npm run lint` · `npm run format:check` · `npm run typecheck`         | Calidad                                                                       |
+| `npm test` · `npm run test:int` · `npm run test:e2e`                  | Pruebas (ver `docs/testing.md`)                                               |
+| `npm run migration:run` · `migration:revert` · `migration:show`       | Migraciones (compila y usa la CLI de TypeORM)                                 |
+| `npm run migration:create -- src/database/migrations/NombreDelCambio` | Crea una migración vacía (después registrala en `migrations/index.ts`)        |
+| `npm run seed:catalogs`                                               | Ubicaciones, oficios y planes (idempotente)                                   |
+| `npm run admin:create -- --email …`                                   | Crea el único admin con segundo factor TOTP                                   |
+| `npm run accounts:purge`                                              | Anonimiza ya las cuentas con la gracia vencida (la API lo hace sola cada día) |
 
 ## Documentación
 

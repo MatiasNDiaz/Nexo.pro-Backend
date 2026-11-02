@@ -38,14 +38,14 @@ exige cuenta `ACTIVE`.
 
 ### Transiciones (las hace el admin, con motivo y auditoría)
 
-| Acción            | Desde                                                       | Hacia                                                                                        | Revoca sesiones |
-| ----------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------- |
-| `suspend`         | `ACTIVE`, `PENDING_VERIFICATION`                            | `SUSPENDED`                                                                                  | Sí              |
-| `ban`             | `ACTIVE`, `PENDING_VERIFICATION`, `SUSPENDED`               | `BANNED`                                                                                     | Sí              |
-| `restore`         | `SUSPENDED`, `BANNED`, o `DEACTIVATED` en período de gracia | `ACTIVE` si la identidad está aprobada; si no, `PENDING_VERIFICATION`                        | No              |
-| `change-role`     | Cliente ↔ profesional (nunca ADMIN)                         | El otro rol; el perfil anterior queda inactivo                                               | Sí              |
-| `revoke-sessions` | Cualquiera                                                  | Sin cambio de estado (cuenta comprometida, ADR 0014)                                         | Sí              |
-| `DELETE` (baja)   | Cualquiera salvo ADMIN                                      | `DEACTIVATED` por 30 días (restaurable) y después anonimización con `npm run accounts:purge` | Sí              |
+| Acción            | Desde                                                       | Hacia                                                                                     | Revoca sesiones |
+| ----------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------- |
+| `suspend`         | `ACTIVE`, `PENDING_VERIFICATION`                            | `SUSPENDED`                                                                               | Sí              |
+| `ban`             | `ACTIVE`, `PENDING_VERIFICATION`, `SUSPENDED`               | `BANNED`                                                                                  | Sí              |
+| `restore`         | `SUSPENDED`, `BANNED`, o `DEACTIVATED` en período de gracia | `ACTIVE` si la identidad está aprobada; si no, `PENDING_VERIFICATION`                     | No              |
+| `change-role`     | Cliente ↔ profesional (nunca ADMIN)                         | El otro rol; el perfil anterior queda inactivo                                            | Sí              |
+| `revoke-sessions` | Cualquiera                                                  | Sin cambio de estado (cuenta comprometida, ADR 0014)                                      | Sí              |
+| `DELETE` (baja)   | Cualquiera salvo ADMIN                                      | `DEACTIVATED` por 30 días (restaurable) y después anonimización (tarea diaria a las 3:00) | Sí              |
 
 Transición inválida → 409 `INVALID_STATE_TRANSITION`. Ninguna se aplica a una cuenta ADMIN
 (409 `CANNOT_MODIFY_ADMIN`). Las cuentas activas también pueden darse de baja solas (`DELETE /users/me`,
@@ -54,18 +54,24 @@ con contraseña).
 ## Ownership (recursos propios)
 
 No es un guard: cada servicio filtra por el usuario **en la consulta** y responde **404** (no 403) si
-el recurso no es suyo, para no confirmar que existe. Ejemplo implementado: `DELETE /auth/sessions/:id`.
+el recurso no es suyo, para no confirmar que existe. Implementado en `DELETE /auth/sessions/:id` y en
+los archivos (`/uploads/:id/…`, `PUT /users/me/avatar`).
 
 ## Rutas actuales
 
-| Ruta                                                                                                                                            | Acceso                                                     |
-| ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `GET /health/live`, `GET /health/ready`                                                                                                         | Público                                                    |
-| `GET /locations/provinces`, `/localities`, `/neighborhoods` (solo aprobados), `GET /professions`                                                | Público                                                    |
-| `POST /auth/register`, `/login`, `/mfa/verify`, `/refresh`, `/logout`, `/email/verify`, `/password/forgot`, `/password/reset`, `GET /auth/csrf` | Público (refresh, logout y csrf usan la cookie de refresh) |
-| `GET /auth/me`, `GET /auth/sessions`, `DELETE /auth/sessions/:id`, `POST /auth/logout-all`                                                      | Con sesión, cualquier estado salvo `DEACTIVATED`           |
-| `POST /auth/email/resend`, `POST /auth/password/change`, `DELETE /users/me`                                                                     | Con sesión, `PENDING_VERIFICATION` o `ACTIVE`              |
-| `POST /admin/users/:id/password-reset`, `/suspend`, `/ban`, `/restore`, `/change-role`, `/revoke-sessions`, `DELETE /admin/users/:id`           | `ADMIN` activo                                             |
+| Ruta                                                                                                                                                              | Acceso                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `GET /health/live`, `GET /health/ready`                                                                                                                           | Público                                                               |
+| `GET /locations/provinces`, `/localities`, `/neighborhoods` (solo aprobados), `GET /professions`                                                                  | Público                                                               |
+| `POST /auth/register`, `/login`, `/mfa/verify`, `/refresh`, `/logout`, `/email/verify`, `/password/forgot`, `/password/reset`, `GET /auth/csrf`                   | Público (refresh, logout y csrf usan la cookie de refresh)            |
+| `GET /auth/me`, `GET /auth/sessions`, `DELETE /auth/sessions/:id`, `POST /auth/logout-all`                                                                        | Con sesión, cualquier estado salvo `DEACTIVATED`                      |
+| `POST /auth/email/resend`, `POST /auth/password/change`, `DELETE /users/me`                                                                                       | Con sesión, `PENDING_VERIFICATION` o `ACTIVE`                         |
+| `GET /uploads/:id/content` (solo archivos públicos, adaptador local)                                                                                              | Público                                                               |
+| `POST /webhooks/identity`                                                                                                                                         | Público, autenticado por **firma** del proveedor (sin CSRF ni Origin) |
+| `POST /uploads`, `POST /uploads/:id/complete`, `PUT /uploads/:id/content`, `PUT /users/me/avatar`, `POST /identity-verification`, `GET /identity-verification/me` | `CUSTOMER` o `PROFESSIONAL`, `PENDING_VERIFICATION` o `ACTIVE`        |
+| `POST /admin/users/:id/password-reset`, `/suspend`, `/ban`, `/restore`, `/change-role`, `/revoke-sessions`, `DELETE /admin/users/:id`                             | `ADMIN` activo                                                        |
+| `GET /admin/identity-verifications`, `POST /admin/identity-verifications/:id/decision`                                                                            | `ADMIN` activo                                                        |
+| `GET /admin/neighborhoods`, `POST /admin/neighborhoods/:id/approve`, `PATCH /admin/neighborhoods/:id`, `POST /admin/neighborhoods/:id/merge`                      | `ADMIN` activo                                                        |
 
 **Garantía automática**: `test/route-security.e2e-spec.ts` recorre todas las rutas registradas y exige
 401 sin sesión en todas salvo una lista explícita de rutas públicas, y 403 en todas las rutas

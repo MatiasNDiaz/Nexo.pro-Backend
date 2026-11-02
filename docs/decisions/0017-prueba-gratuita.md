@@ -5,7 +5,7 @@
 **Decisión.** La prueba del profesional **empieza al registrarse** y dura 30 días corridos, complete o
 no su perfil: si tarda en cargar sus datos, esos días se pierden. No hay ninguna otra regla para
 "perder la prueba". El profesional ve un **contador de días restantes** y recibe **recordatorios**
-antes de que termine.
+antes de que termine. Durante la prueba rigen los **límites del plan Basic** (confirmado el 02/11/2026).
 
 **Consecuencias.**
 

@@ -26,34 +26,39 @@ Fuente: plan §4.2 y §4.3 más el análisis de la etapa 1. Se actualiza al cerr
 | C-29        | Sanción solo al perfil profesional                                      | Tipo de sanción `PROFILE_HIDDEN`                                          | Etapa 11      |
 | C-32        | Alcance del acceso del admin a chats                                    | Solo con reporte, auditado (legal)                                        | Etapa 11      |
 
-Resueltas: C-01 (ADR 0002), C-02 (ADR 0003, provisoria), C-05 (ADR 0009), C-15 (puerto 3001), C-16 (ADR 0013, **pendiente de revisión legal**), C-23 (ADR 0017), C-25 (ADR 0014), C-26 (mail de consola), C-31 (ADR 0005), C-33 (ADR 0006 y 0010), C-35 (ADR 0007), C-36 (ADR 0016). C-17, C-20, C-21 y C-22 son técnicas y se aplican como propone el plan.
+Resueltas: P-14 (pesos de archivos, ADR 0018), C-01 (ADR 0002), C-02 (ADR 0003, provisoria), C-05 (ADR 0009), C-15 (puerto 3001), C-16 (ADR 0013, **pendiente de revisión legal**), C-23 (ADR 0017), C-25 (ADR 0014), C-26 (mail de consola), C-31 (ADR 0005), C-33 (ADR 0006 y 0010), C-35 (ADR 0007), C-36 (ADR 0016). C-17, C-20, C-21 y C-22 son técnicas y se aplican como propone el plan.
 
 C-34 (admin único con MFA): mitigado con 10 códigos de recuperación de un solo uso. Falta un procedimiento para reenrolar el TOTP si se pierden dispositivo y códigos (hoy requiere intervención directa en la base).
 
 ## Decisiones pendientes
 
-| #           | Tema                                                     | Solución provisoria                                                                                          | Bloquea                  |
-| ----------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------ |
-| P-04        | Máquina de estados de contrataciones                     | Propuesta FI §11.3 en tabla de transiciones                                                                  | Etapa 8                  |
-| P-05        | Retención de chats                                       | No borrar                                                                                                    | Legal                    |
-| P-06 / P-07 | Débito automático, multa e interés                       | No implementar                                                                                               | Etapa 9 / legal          |
-| P-08        | Política de sanciones                                    | Solo manual por el admin                                                                                     | Etapa 11                 |
-| P-09 / P-10 | Clasificación de clientes y ranking                      | No exponer / orden provisional                                                                               | Etapa 7 / 10             |
-| P-11        | Ubicación en tiempo real, "cerca de mí"                  | Solo zona declarada                                                                                          | Etapa 7                  |
-| P-13        | Marca definitiva                                         | Prefijo `nx_` (ADR 0008)                                                                                     | Producción               |
-| P-14        | Pesos máximos de archivos (ADR 0018)                     | Propuesta por plan: imágenes 5 MB (Premium 10 MB), videos 30 MB (Premium 50 MB), siempre ≤ 15 s. A confirmar | Etapa 7                  |
-| P-15        | Canales externos de notificación                         | Solo internas + email de auth                                                                                | Etapa 13                 |
-| —           | Proveedor de email transaccional y dominio (SPF/DKIM)    | Adaptador de consola. **Sin él la API no arranca en producción** (la validación lo exige)                    | Producción (ADR 0002)    |
-| —           | Login con Google (ADR 0015)                              | Agendado como etapa 7B: credenciales OAuth de Google y URLs de callback por ambiente                         | Etapa 7B                 |
-| —           | Efecto del cambio de rol sobre la suscripción (ADR 0012) | Sin efecto hasta que existan las suscripciones                                                               | Etapa 9                  |
-| —           | Revisión legal de la baja de cuenta (ADR 0013 y 0016)    | 30 días de gracia con los datos guardados y después anonimización; qué se conserva y por cuánto tiempo       | Legal                    |
-| —           | Duración de las suspensiones                             | Indefinidas hasta que el admin las levanta; duraciones y sanciones en la etapa 11 (C-09)                     | Etapa 11                 |
-| —           | CAPTCHA tras varios fallos de login/registro             | Sin CAPTCHA; rate limit por IP + bloqueo por cuenta                                                          | Producción               |
-| —           | Rechazo de contraseñas filtradas (HIBP)                  | No implementado (llamada externa, ADR 0011)                                                                  | Producción               |
-| —           | Cambio de email (confirmación al nuevo, aviso al viejo)  | No implementado                                                                                              | Etapa 7                  |
-| —           | Límite de sesiones activas por usuario                   | Sin límite                                                                                                   | Etapa 12                 |
-| —           | Limpieza de sesiones y tokens vencidos (job)             | Sin job: las filas vencidas no sirven pero quedan                                                            | Etapa 12                 |
-| —           | Avisos al admin por cada registro (CF §6.5)              | Solo auditoría `USER_REGISTERED`                                                                             | Etapa 8 (notificaciones) |
+| #           | Tema                                                     | Solución provisoria                                                                                     | Bloquea                  |
+| ----------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------ |
+| P-04        | Máquina de estados de contrataciones                     | Propuesta FI §11.3 en tabla de transiciones                                                             | Etapa 8                  |
+| P-05        | Retención de chats                                       | No borrar                                                                                               | Legal                    |
+| P-06 / P-07 | Débito automático, multa e interés                       | No implementar                                                                                          | Etapa 9 / legal          |
+| P-08        | Política de sanciones                                    | Solo manual por el admin                                                                                | Etapa 11                 |
+| P-09 / P-10 | Clasificación de clientes y ranking                      | No exponer / orden provisional                                                                          | Etapa 7 / 10             |
+| P-11        | Ubicación en tiempo real, "cerca de mí"                  | Solo zona declarada                                                                                     | Etapa 7                  |
+| P-13        | Marca definitiva                                         | Prefijo `nx_` (ADR 0008)                                                                                | Producción               |
+| P-15        | Canales externos de notificación                         | Solo internas + email de auth                                                                           | Etapa 13                 |
+| —           | Proveedor de email transaccional y dominio (SPF/DKIM)    | Adaptador de consola. **Sin él la API no arranca en producción** (la validación lo exige)               | Producción (ADR 0002)    |
+| —           | Login con Google (ADR 0015)                              | Agendado como etapa 7B: credenciales OAuth de Google y URLs de callback por ambiente                    | Etapa 7B                 |
+| —           | Efecto del cambio de rol sobre la suscripción (ADR 0012) | Sin efecto hasta que existan las suscripciones                                                          | Etapa 9                  |
+| —           | Revisión legal de la baja de cuenta (ADR 0013 y 0016)    | 30 días de gracia con los datos guardados y después anonimización; qué se conserva y por cuánto tiempo  | Legal                    |
+| —           | Duración de las suspensiones                             | Indefinidas hasta que el admin las levanta; duraciones y sanciones en la etapa 11 (C-09)                | Etapa 11                 |
+| —           | CAPTCHA tras varios fallos de login/registro             | Sin CAPTCHA; rate limit por IP + bloqueo por cuenta                                                     | Producción               |
+| —           | Rechazo de contraseñas filtradas (HIBP)                  | No implementado (llamada externa, ADR 0011)                                                             | Producción               |
+| —           | Cambio de email (confirmación al nuevo, aviso al viejo)  | No implementado                                                                                         | Etapa 7.2                |
+| —           | Credenciales de Cloudinary (cuenta del fundador)         | Adaptador local en disco. **Sin Cloudinary la API no arranca en producción** (la validación lo exige)   | Producción               |
+| —           | Cambiar la foto después de verificar la identidad        | Se permite y no reabre la verificación. ¿Debería volver a revisión o quedar bloqueada?                  | Etapa 7.2                |
+| —           | Proveedor real de verificación de identidad (ADR 0003)   | Manual: el admin decide (videollamada). Elegir proveedor y revisión legal del consentimiento biométrico | Legal / etapa 13         |
+| —           | Reintento de borrados fallidos en Cloudinary             | Se registra en el log; el archivo queda marcado DELETED en la base. Job de reintento                    | Etapa 12                 |
+| —           | Moderación del contenido de las fotos                    | Sin moderación automática; el admin ve la foto al verificar la identidad. Reportes en la etapa 11       | Etapa 11                 |
+| —           | Aviso al admin de verificaciones pendientes              | El admin consulta la cola (`GET /admin/identity-verifications`)                                         | Etapa 8 (notificaciones) |
+| —           | Límite de sesiones activas por usuario                   | Sin límite                                                                                              | Etapa 12                 |
+| —           | Limpieza de sesiones y tokens vencidos (job)             | Sin job: las filas vencidas no sirven pero quedan                                                       | Etapa 12                 |
+| —           | Avisos al admin por cada registro (CF §6.5)              | Solo auditoría `USER_REGISTERED`                                                                        | Etapa 8 (notificaciones) |
 
 ## Valores provisorios cargados en la base (etapa 4)
 

@@ -10,7 +10,8 @@ Monolito modular NestJS (plan §5–7). Controllers delgados, reglas de negocio 
 | 4. Base de datos            | Hecha: TypeORM, migraciones, roles de base, auditoría append-only, catálogos (ubicaciones, oficios, planes), `/health/ready`                                                                             |
 | 5. Usuarios y autenticación | Hecha: registro en dos pasos con barrios creados por usuarios, login con cookies, refresh rotativo, CSRF, MFA del admin, reset por admin, guards globales (ver `docs/auth.md` y `docs/authorization.md`) |
 | 6. Autorización y estados   | Hecha: suspensión, baneo, restauración, cambio de rol, revocación de sesiones y baja con anonimización (admin y propia); test que recorre todas las rutas                                                |
-| 7–13                        | Pendientes (ver `docs/roadmap.md`, incluye la etapa 7B de login con Google)                                                                                                                              |
+| 7.1 Archivos e identidad    | Hecha: archivos (Cloudinary/local) y foto de perfil, verificación de identidad (módulo de referencia), moderación de barrios, tareas programadas                                                         |
+| 7.2–13                      | Pendientes (ver `docs/roadmap.md`, incluye la etapa 7B de login con Google)                                                                                                                              |
 
 ## Estructura actual
 
@@ -41,11 +42,15 @@ src/
 ├── common/guards/          # Origin, JwtAuth, Csrf, AccountState, Roles (globales)
 ├── common/crypto/          # tokens aleatorios, SHA-256, HMAC, AES-256-GCM
 ├── auth/                   # registro, login, MFA, sesiones, CSRF, cookies, reset, CLI admin:create
-├── users/                  # entidad y enums de usuario
+├── users/                  # entidad, ciclo de vida de la cuenta, purga diaria (cron)
 ├── professionals/entities/ # perfil mínimo, profesiones y zonas de trabajo
 ├── integrations/mail/      # MailProvider + adaptadores consola/memoria
+├── integrations/storage/   # StorageProvider + Cloudinary / disco local, detección de tipo real
+├── integrations/identity/  # IdentityVerificationProvider + manual / simulado (fake)
+├── uploads/                # stored_files, tickets de subida, confirmación, foto de perfil, limpieza
+├── identity-verification/  # intentos, webhook del proveedor, cola y decisiones del admin
 ├── audit/                  # AuditService (puerto AUDIT_LOGGER), global
-├── locations/              # provincias, localidades, barrios (normalización, autocompletado)
+├── locations/              # provincias, localidades, barrios (autocompletado y moderación del admin)
 ├── professions/            # catálogo público de oficios
 ├── subscriptions/entities/ # planes
 └── health/                 # GET /api/v1/health/live y /ready
@@ -56,7 +61,7 @@ test/
 └── *.e2e-spec.ts           # app real con Supertest
 ```
 
-`locations` y `professions` exponen solo lo que necesita el registro; su administración llega en la etapa 7.
+`professions` expone solo lo que necesita el registro; su administración llega con el panel del admin.
 
 ## Pipeline de una request
 
@@ -121,3 +126,17 @@ Detalle de cada guard en `docs/authorization.md`. El de suscripción/plan llega 
 - **Sin tabla `role_changes`**: el historial de roles vive en la auditoría (`ROLE_CHANGED`).
 - **Test de todas las rutas**: lee las rutas registradas en Express y exige 401 sin sesión salvo una
   lista explícita de públicas.
+
+**Etapa 7.1**
+
+- **Subida directa al proveedor:** el binario no pasa por la API (con Cloudinary). La API emite un
+  ticket firmado y, al confirmar, consulta al proveedor el tipo, el peso y la duración reales. El
+  adaptador local imita el flujo con `PUT /uploads/:id/content` y detecta el tipo por magic bytes.
+- **Actualizaciones condicionales** (`WHERE status = 'PENDING_UPLOAD'`) en vez de locks largos: la
+  consulta al proveedor queda fuera de las transacciones.
+- **Verificación de identidad portada** de `docs/referencia/verificacion-identidad`: misma máquina de
+  estados e idempotencia; usa la auditoría, la configuración y las sesiones del proyecto. Exige email
+  verificado y foto (ADR 0006); al revocar cierra las sesiones en la misma transacción.
+- **`rawBody: true`** en la app: el webhook valida la firma sobre los bytes exactos.
+- **Tareas programadas** con `@nestjs/schedule` (apagadas en tests) y un lock de PostgreSQL
+  (`pg_try_advisory_lock`) para que dos instancias, o el comando manual, no corran a la vez.

@@ -19,7 +19,7 @@ agrega su parte y la documenta acá.
 Un test de integración compara las entidades con el esquema real que dejan las migraciones; si alguien
 cambia una entidad sin migración (o al revés), falla.
 
-## Diagrama (etapas 4 y 5)
+## Diagrama (etapas 4 a 7.1)
 
 ```mermaid
 erDiagram
@@ -38,6 +38,10 @@ erDiagram
   localities ||--o{ professional_service_areas : ""
   neighborhoods |o--o{ professional_service_areas : "null = toda la localidad"
   users |o--o{ admin_audit_logs : "actor"
+  users ||--o{ stored_files : "sube"
+  stored_files |o--o| users : "avatar_file_id"
+  users ||--o{ identity_verifications : "intenta"
+  identity_verifications |o--o{ identity_provider_events : "avisos del proveedor"
 
   users {
     uuid id PK
@@ -95,6 +99,38 @@ erDiagram
     uuid locality_id FK
     uuid neighborhood_id FK
   }
+  stored_files {
+    uuid id PK
+    uuid owner_user_id FK
+    varchar provider "CLOUDINARY LOCAL"
+    varchar storage_key UK
+    file_purpose purpose "AVATAR (7.2 suma más)"
+    file_kind kind "IMAGE VIDEO"
+    file_visibility visibility
+    file_status status "PENDING_UPLOAD READY REJECTED DELETED"
+    varchar mime_type "detectado, no declarado"
+    bigint size_bytes
+    int duration_ms "máximo 15,5 s"
+  }
+  identity_verifications {
+    uuid id PK "generado en la app"
+    uuid user_id FK
+    verification_status status
+    varchar provider
+    varchar provider_reference
+    smallint attempt_number
+    verification_decision_source decision_source
+    varchar reason_code
+    varchar admin_note "interna"
+    uuid decided_by FK
+  }
+  identity_provider_events {
+    uuid id PK
+    varchar provider
+    varchar event_id "único con provider"
+    uuid verification_id FK
+    timestamptz processed_at
+  }
 ```
 
 Las tablas de la etapa 4 (`provinces`, `localities`, `professions`, `subscription_plans`,
@@ -115,13 +151,22 @@ Las tablas de la etapa 4 (`provinces`, `localities`, `professions`, `subscriptio
 | `professional_profiles`      | Perfil profesional (mínimo hasta la etapa 7). `deactivated_at` si el usuario cambió de rol o se dio de baja (ADR 0012) | Uno por usuario                                                                                                                 |
 | `professional_professions`   | Oficios del profesional                                                                                                | Una sola principal por profesional (índice parcial)                                                                             |
 | `professional_service_areas` | Zonas de trabajo (1 a 20)                                                                                              | El barrio pertenece a la localidad (FK compuesta); sin zonas repetidas (`NULLS NOT DISTINCT`)                                   |
+| `stored_files`               | Metadatos de archivos (ADR 0018); el binario está en Cloudinary (o en disco en desarrollo)                             | `storage_key` único; READY exige tipo y peso; duración ≤ 15,5 s; índice parcial de pendientes para la limpieza                  |
+| `identity_verifications`     | Intentos de verificación de identidad (ADR 0003). Sin imágenes ni datos biométricos                                    | Un solo intento abierto por usuario (índice único parcial); `(user_id, attempt_number)` único; referencia del proveedor única   |
+| `identity_provider_events`   | Webhooks recibidos del proveedor                                                                                       | `(provider, event_id)` único: idempotencia                                                                                      |
 | `admin_audit_logs`           | Acciones administrativas y eventos de seguridad                                                                        | **Append-only**: un trigger rechaza `UPDATE`, `DELETE` y `TRUNCATE`; el rol de runtime solo tiene `SELECT` e `INSERT`           |
 
 Eventos auditados hoy: `USER_REGISTERED`, `ACCOUNT_LOCKED`, `REFRESH_TOKEN_REUSE`, `ADMIN_LOGIN`,
 `ADMIN_LOGIN_RECOVERY_CODE`, `ADMIN_PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET_COMPLETED`,
 `PASSWORD_CHANGED`, `ADMIN_CREATED`, `ACCOUNT_SUSPENDED`, `ACCOUNT_BANNED`, `ACCOUNT_RESTORED`,
 `ROLE_CHANGED` (con rol de origen y destino: reemplaza a la tabla `role_changes` del plan),
-`SESSIONS_REVOKED`, `ACCOUNT_DELETION_SCHEDULED`, `ACCOUNT_ANONYMIZED`.
+`SESSIONS_REVOKED`, `ACCOUNT_DELETION_SCHEDULED`, `ACCOUNT_ANONYMIZED`,
+`IDENTITY_VERIFICATION_APPROVE` / `_REJECT` / `_REVOKE` (también los intentos denegados, con
+resultado `DENIED`), `NEIGHBORHOOD_APPROVED`, `NEIGHBORHOOD_RENAMED` y `NEIGHBORHOOD_MERGED` (con
+cuántos clientes y zonas se movieron).
+
+`users.avatar_file_id`: foto de perfil (paso 2 del registro, ADR 0006). Al anonimizar una cuenta, sus
+archivos pasan a `DELETED` y se borran del proveedor.
 
 `users.deletion_scheduled_for`: fecha en que se anonimiza una cuenta dada de baja (30 días de gracia, ADR 0016).
 
