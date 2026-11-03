@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { mercadoPagoSignature, parseMercadoPagoWebhook } from './mercadopago-signature';
 import {
   type CheckoutInput,
@@ -20,7 +20,11 @@ export class FakePaymentProvider implements PaymentProvider {
   readonly name = 'MERCADOPAGO';
   private readonly checkouts = new Map<string, CheckoutInput>();
   private readonly payments = new Map<string, ProviderPayment>();
-  private nextId = 1_000_000;
+  /**
+   * Ids numéricos como los de Mercado Pago, distintos en cada instancia: varias apps (una por suite
+   * de tests) comparten la base, donde el id del pago y el del aviso son únicos.
+   */
+  private nextId = Date.now() * 1000 + randomInt(1000);
 
   constructor(private readonly webhookSecret: string) {}
 

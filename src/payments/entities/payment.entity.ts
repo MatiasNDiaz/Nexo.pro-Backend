@@ -33,6 +33,18 @@ export enum PaymentStatus {
   CHARGED_BACK = 'CHARGED_BACK',
 }
 
+/** Tipo de pago para el panel de ingresos (ADR 0030). Se fija al aplicarse. */
+export enum PaymentKind {
+  /** Primer pago de la cuenta (sin otro anterior que siga en pie). */
+  NEW = 'NEW',
+  /** Mes siguiente pagado con el período todavía vigente. */
+  RENEWAL = 'RENEWAL',
+  /** Ya había pagado, se le venció y volvió a pagar. */
+  REACTIVATION = 'REACTIVATION',
+  /** Diferencia para subir de plan (C-24). */
+  UPGRADE = 'UPGRADE',
+}
+
 /**
  * Pago de un plan (ADR 0026). Guarda una copia del importe al crearlo y qué dio al aplicarse, para
  * poder revertirlo si después se reembolsa o se desconoce.
@@ -42,7 +54,15 @@ export enum PaymentStatus {
 @Index(['subscriptionId'])
 @Index(['planId'])
 @Index(['previousPlanId'])
+// Parciales (panel de ingresos, ADR 0030): creados en la migración.
+@Index('ix_payments_approved_at', { synchronize: false })
+@Index('ix_payments_money_returned_at', { synchronize: false })
 @Check('ck_payments_amount', 'amount > 0')
+@Check('ck_payments_kind', 'kind IS NULL OR applied_at IS NOT NULL')
+@Check(
+  'ck_payments_money_returned',
+  "(money_returned_at IS NOT NULL) = (status IN ('REFUNDED', 'CHARGED_BACK'))",
+)
 @Check('ck_payments_currency', "currency ~ '^[A-Z]{3}$'")
 @Check('ck_payments_provider', "provider IN ('MERCADOPAGO')")
 @Check(
@@ -128,6 +148,17 @@ export class Payment {
   /** Cuándo se revirtió por un reembolso o un contracargo. */
   @Column({ type: 'timestamptz', nullable: true })
   revertedAt: Date | null;
+
+  /** Null hasta que se aplica (un aprobado que no coincidió queda sin tipo). */
+  @Column({ type: 'enum', enum: PaymentKind, enumName: 'payment_kind', nullable: true })
+  kind: PaymentKind | null;
+
+  /**
+   * Cuándo se devolvió la plata (primer aviso de reembolso o contracargo), aunque el pago no se
+   * hubiera aplicado. El panel resta el importe en esta fecha (criterio de caja, ADR 0030).
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  moneyReturnedAt: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;

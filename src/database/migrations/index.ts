@@ -20,6 +20,7 @@ import { Payments1793640018000 } from './1793640018000-Payments';
 import { ReviewsFavoritesForum1793640019000 } from './1793640019000-ReviewsFavoritesForum';
 import { Moderation1793640020000 } from './1793640020000-Moderation';
 import { Hardening1793640021000 } from './1793640021000-Hardening';
+import { RevenuePanel1793640022000 } from './1793640022000-RevenuePanel';
 
 /**
  * Lista explícita (en orden) de migraciones. Se registran a mano en vez de con un glob para que
@@ -49,4 +50,5 @@ export const MIGRATIONS = [
   ReviewsFavoritesForum1793640019000,
   Moderation1793640020000,
   Hardening1793640021000,
+  RevenuePanel1793640022000,
 ];

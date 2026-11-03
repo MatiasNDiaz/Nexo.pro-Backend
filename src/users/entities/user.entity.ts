@@ -25,6 +25,8 @@ import { AccountStatus, UserRole, VerificationStatus } from '../user.enums';
 @Index(['neighborhoodId'])
 @Index(['avatarFileId'])
 @Index(['pendingAvatarFileId'])
+// Registros por fecha en el panel de ingresos (ADR 0030).
+@Index(['createdAt'])
 // Parcial (solo cuentas en gracia): creado en la migración.
 @Index('ix_users_deletion_scheduled_for', { synchronize: false })
 @Check('ck_users_failed_login_attempts', 'failed_login_attempts >= 0')

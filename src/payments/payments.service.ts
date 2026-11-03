@@ -47,7 +47,13 @@ import type {
   PaymentItemDto,
   PlanOptionDto,
 } from './dto/payments.dto';
-import { Payment, PaymentEvent, PaymentPurpose, PaymentStatus } from './entities/payment.entity';
+import {
+  Payment,
+  PaymentEvent,
+  PaymentKind,
+  PaymentPurpose,
+  PaymentStatus,
+} from './entities/payment.entity';
 import { computeLedger, type LedgerState, quotePlan, toCents } from './subscription-ledger';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -327,7 +333,15 @@ export class PaymentsService {
       case 'CHARGED_BACK': {
         const status = PaymentStatus[info.status];
         if (payment.status === status) return null;
-        await payments.update(payment.id, { providerPaymentId: info.providerPaymentId, status });
+        await payments.update(payment.id, {
+          providerPaymentId: info.providerPaymentId,
+          status,
+          // Un reembolso que después pasa a contracargo conserva la primera fecha.
+          moneyReturnedAt: payment.moneyReturnedAt ?? now,
+          // Si nunca nos llegó el aviso de aprobado, la plata igual entró: sin esto el panel
+          // restaría una devolución sin haber sumado el cobro.
+          approvedAt: payment.approvedAt ?? info.approvedAt ?? now,
+        });
         if (payment.appliedAt && !payment.revertedAt) {
           await this.revert(manager, payment, info.status, now, after);
         }
@@ -386,7 +400,8 @@ export class PaymentsService {
       });
       return 'NOT_APPLICABLE';
     }
-    await manager.getRepository(Payment).update(payment.id, { appliedAt: now });
+    const kind = await this.kindOf(manager, payment, before.status);
+    await manager.getRepository(Payment).update(payment.id, { appliedAt: now, kind });
     const state = await this.ledgerOf(manager, subscription, now);
     const grant = state.grants.get(payment.id);
     await manager.getRepository(Payment).update(payment.id, {
@@ -414,6 +429,26 @@ export class PaymentsService {
         : `Tu plan está pago hasta el ${formatDate(state.periodEnd!)}.`,
     );
     return null;
+  }
+
+  /**
+   * Tipo para el panel de ingresos (ADR 0030): la diferencia es una mejora; con el período vigente,
+   * una renovación; si ya había pagado antes (y ese pago sigue en pie), una reactivación.
+   */
+  private async kindOf(
+    manager: EntityManager,
+    payment: Payment,
+    statusBefore: SubscriptionStatus,
+  ): Promise<PaymentKind> {
+    if (payment.purpose === PaymentPurpose.UPGRADE_DIFFERENCE) return PaymentKind.UPGRADE;
+    if (statusBefore === SubscriptionStatus.ACTIVE) return PaymentKind.RENEWAL;
+    const paidBefore = await manager.getRepository(Payment).existsBy({
+      userId: payment.userId,
+      id: Not(payment.id),
+      appliedAt: Not(IsNull()),
+      revertedAt: IsNull(),
+    });
+    return paidBefore ? PaymentKind.REACTIVATION : PaymentKind.NEW;
   }
 
   /** Control 2 (ADR 0026): reembolso o contracargo de un pago aplicado. */
