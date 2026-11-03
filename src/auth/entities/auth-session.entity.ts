@@ -88,6 +88,13 @@ export class AuthSession {
   @Column({ type: 'varchar', length: 64, nullable: true })
   ipHash: string | null;
 
+  /**
+   * HMAC de la cookie de dispositivo (ADR 0031): reconoce un dispositivo ya usado por la cuenta
+   * para no avisar por email en cada inicio de sesión. Null en las sesiones anteriores a la 13.2.
+   */
+  @Column({ type: 'char', length: 64, nullable: true })
+  deviceHash: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

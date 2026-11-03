@@ -6,6 +6,10 @@ export interface RequestMeta {
   userAgent: string | null;
   /** HMAC de la IP: sirve para comparar ("¿misma IP?") sin guardar la IP. */
   ipHash: string | null;
+  /** HMAC de la cookie de dispositivo; solo al iniciar sesión (`LoginContextService`, ADR 0031). */
+  deviceHash?: string | null;
+  /** Ciudad aproximada, solo para el email de dispositivo nuevo. NUNCA se guarda. */
+  approximateLocation?: string | null;
 }
 
 const USER_AGENT_MAX = 255;

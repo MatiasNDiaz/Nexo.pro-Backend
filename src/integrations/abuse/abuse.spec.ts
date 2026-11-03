@@ -30,7 +30,11 @@ describe('isPasswordBreached (Have I Been Pwned, k-anonimato)', () => {
 
 describe('CaptchaService (Turnstile)', () => {
   const service = (secret: string, success = true) => {
-    const captcha = new CaptchaService({ passwordBreachCheck: false, turnstileSecret: secret });
+    const captcha = new CaptchaService({
+      passwordBreachCheck: false,
+      turnstileSecret: secret,
+      cloudflareEdgeSecret: '',
+    });
     captcha.fetchFn = jest
       .fn()
       .mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ success }))));

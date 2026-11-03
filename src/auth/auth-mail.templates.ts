@@ -11,6 +11,8 @@ export const FRONTEND_PATHS = {
   linkGoogle: '/vincular-google',
   /** Adonde vuelve el navegador después de Google, con `?resultado=` (ver docs/auth.md). */
   googleResult: '/ingresar/google',
+  /** "No fui yo" del aviso de dispositivo nuevo: la página cierra la sesión con un POST (ADR 0031). */
+  closeSession: '/cerrar-sesion',
 } as const;
 
 const SIGNATURE = '\n\nSi no fuiste vos, ignorá este mensaje o escribinos a soporte.';
@@ -59,6 +61,30 @@ export function passwordChangedMail(to: string, firstName: string): MailMessage 
     to,
     subject: 'Tu contraseña cambió',
     text: `Hola ${firstName}:\n\nLa contraseña de tu cuenta se cambió recién.${SIGNATURE}`,
+  };
+}
+
+export function newDeviceLoginMail(
+  to: string,
+  firstName: string,
+  details: { at: Date; device: string; location: string | null },
+  link: string,
+): MailMessage {
+  const when = details.at.toLocaleString('es-AR', {
+    timeZone: 'America/Argentina/Cordoba',
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
+  return {
+    to,
+    subject: 'Nuevo inicio de sesión en tu cuenta',
+    text:
+      `Hola ${firstName}:\n\nSe inició sesión en tu cuenta desde un dispositivo nuevo.\n\n` +
+      `Fecha y hora: ${when} (hora de Córdoba)\n` +
+      `Dispositivo: ${details.device}\n` +
+      `Ubicación aproximada: ${details.location ?? 'no disponible'}\n\n` +
+      'Si fuiste vos, no tenés que hacer nada.\n\n' +
+      `Si no fuiste vos, cerrá esa sesión desde este enlace (vence en 7 días) y después cambiá tu contraseña:\n${link}`,
   };
 }
 

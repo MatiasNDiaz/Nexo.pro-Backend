@@ -17,6 +17,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { AdminPanelModule } from './admin/admin-panel.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { AbuseModule } from './integrations/abuse/abuse.module';
+import { GeoModule } from './integrations/geo/geo.module';
 import { abuseConfig } from './config/abuse.config';
 import { ModerationModule } from './moderation/moderation.module';
 import { SupportModule } from './support/support.module';
@@ -99,6 +100,7 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
     AuditModule,
     MonitoringModule,
     AbuseModule,
+    GeoModule,
     MailModule,
     HealthModule,
     LocationsModule,

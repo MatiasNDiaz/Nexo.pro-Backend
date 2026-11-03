@@ -1,4 +1,10 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataSource, EntityManager, IsNull, MoreThan } from 'typeorm';
 import { AUDIT_LOGGER, type AuditLogger } from '../../audit/audit-logger';
@@ -9,6 +15,7 @@ import { User } from '../../users/entities/user.entity';
 import { AccountStatus, UserRole } from '../../users/user.enums';
 import { AuthSession, SessionRevokeReason } from '../entities/auth-session.entity';
 import { RequestMeta } from '../request-meta';
+import { SessionCloseLinkService } from './session-close-link.service';
 import { TokenService } from './token.service';
 
 /** Dispositivos con sesión abierta por usuario (aprobado el 03/11/2026). */
@@ -53,6 +60,7 @@ export class SessionsService {
     private readonly tokens: TokenService,
     @Inject(authConfig.KEY) private readonly config: AuthConfig,
     @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
+    private readonly closeLinks: SessionCloseLinkService,
   ) {}
 
   /**
@@ -124,12 +132,13 @@ export class SessionsService {
       if (!user || current.expiresAt <= now || current.familyExpiresAt <= now) {
         return { kind: 'INVALID' } as const;
       }
+      // El dispositivo es el mismo de toda la familia (la cookie solo viaja al iniciar sesión).
       const next = await this.insertRow(
         manager,
         user,
         current.familyId,
         current.familyExpiresAt,
-        meta,
+        { ...meta, deviceHash: current.deviceHash },
         now,
       );
       await sessions.update(current.id, {
@@ -235,6 +244,48 @@ export class SessionsService {
     if (!result.affected) throw new NotFoundException();
   }
 
+  /** ¿La cuenta ya inició sesión desde este dispositivo? (sesiones guardadas, ADR 0031) */
+  knownDevice(manager: EntityManager, userId: string, deviceHash: string): Promise<boolean> {
+    return manager.getRepository(AuthSession).existsBy({ userId, deviceHash });
+  }
+
+  /**
+   * "No fui yo" desde el email de dispositivo nuevo (ADR 0031): cierra esa familia. Con el enlace
+   * vencido o adulterado, 400; si ya estaba cerrada, `closed: false`. Queda auditado.
+   */
+  async closeByLink(token: string, meta: RequestMeta): Promise<{ closed: boolean }> {
+    const link = this.closeLinks.verify(token);
+    if (!link) {
+      throw new BadRequestException({
+        code: 'INVALID_TOKEN',
+        message: 'El enlace no es válido o venció.',
+      });
+    }
+    return this.dataSource.transaction(async (manager) => {
+      const result = await manager
+        .createQueryBuilder()
+        .update(AuthSession)
+        .set({ revokedAt: new Date(), revokeReason: SessionRevokeReason.SESSION_CLOSED })
+        .where('family_id = :familyId AND user_id = :userId AND revoked_at IS NULL', link)
+        .execute();
+      const closed = (result.affected ?? 0) > 0;
+      await this.audit.record(
+        {
+          actorId: link.userId,
+          action: 'SESSION_CLOSED_FROM_EMAIL',
+          targetType: 'USER',
+          targetId: link.userId,
+          reason: null,
+          result: 'SUCCESS',
+          metadata: { familyId: link.familyId, closed },
+          ipHash: meta.ipHash,
+        },
+        manager,
+      );
+      return { closed };
+    });
+  }
+
   /**
    * Exige que el dispositivo haya iniciado sesión hace menos de 10 minutos (ADR 0023): con una
    * sesión vieja robada no se puede crear contraseña ni dar de baja una cuenta sin contraseña.
@@ -277,6 +328,7 @@ export class SessionsService {
       familyExpiresAt,
       userAgent: meta.userAgent,
       ipHash: meta.ipHash,
+      deviceHash: meta.deviceHash ?? null,
     });
     await manager.getRepository(AuthSession).insert(session);
     return { session, refreshToken: token };

@@ -15,7 +15,12 @@ import { type AuthConfig, authConfig } from '../../config/auth.config';
 import { CaptchaService } from '../../integrations/abuse/captcha.service';
 import { User } from '../../users/entities/user.entity';
 import { AccountStatus, UserRole } from '../../users/user.enums';
-import { AuthEvents, TokenMailEvent, UserMailEvent } from '../auth.events';
+import {
+  AuthEvents,
+  type NewDeviceLoginEvent,
+  TokenMailEvent,
+  UserMailEvent,
+} from '../auth.events';
 import { MfaVerifyDto } from '../dto/auth-requests.dto';
 import { SessionRevokeReason } from '../entities/auth-session.entity';
 import { OneTimeTokenType } from '../entities/one-time-token.entity';
@@ -325,16 +330,38 @@ export class AuthService {
     await this.emitUserMail(AuthEvents.PASSWORD_CHANGED, user);
   }
 
-  /** Abre un dispositivo nuevo y limpia el bloqueo por intentos (también lo usa el login con Google). */
+  /**
+   * Abre un dispositivo nuevo y limpia el bloqueo por intentos (también lo usa el login con Google).
+   * Si la cuenta nunca usó este dispositivo, avisa por email (ADR 0031), salvo en su primer inicio
+   * de sesión.
+   */
   async startSession(user: User, meta: RequestMeta): Promise<IssuedSession> {
-    return this.dataSource.transaction(async (manager) => {
+    const now = new Date();
+    const { issued, knownDevice } = await this.dataSource.transaction(async (manager) => {
+      // Antes de crear la sesión: si no, el dispositivo siempre figuraría como conocido.
+      const knownDevice = meta.deviceHash
+        ? await this.sessions.knownDevice(manager, user.id, meta.deviceHash)
+        : true;
       await manager.getRepository(User).update(user.id, {
         failedLoginAttempts: 0,
         lockedUntil: null,
-        lastLoginAt: new Date(),
+        lastLoginAt: now,
       });
-      return this.sessions.create(user, meta, manager);
+      return { issued: await this.sessions.create(user, meta, manager), knownDevice };
     });
+    if (!knownDevice && user.lastLoginAt) {
+      const payload: NewDeviceLoginEvent = {
+        email: user.email,
+        firstName: user.firstName,
+        userId: user.id,
+        familyId: issued.session.familyId,
+        at: now,
+        userAgent: meta.userAgent,
+        approximateLocation: meta.approximateLocation ?? null,
+      };
+      await this.events.emitAsync(AuthEvents.NEW_DEVICE_LOGIN, payload);
+    }
+    return issued;
   }
 
   private async issuePasswordReset(

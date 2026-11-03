@@ -326,6 +326,15 @@ export class EnvironmentVariables {
   @MinLength(20)
   TURNSTILE_SECRET_KEY?: string;
 
+  /**
+   * Secreto que Cloudflare agrega en el encabezado `x-nexo-edge-secret` (regla de transformación).
+   * Solo con él se confía en la ciudad aproximada de Cloudflare (ADR 0031). Sin él: sin ciudad.
+   */
+  @IsOptional()
+  @IsString()
+  @MinLength(32)
+  CLOUDFLARE_EDGE_SECRET?: string;
+
   // ---- Monitoreo (etapa 12) ----
 
   /** DSN de Sentry. Sin él, el reporte de errores queda apagado. */

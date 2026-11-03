@@ -79,6 +79,10 @@ export class MessageDto {
   @ApiProperty() message: string;
 }
 
+export class SessionClosedDto {
+  @ApiProperty({ description: 'false si esa sesión ya estaba cerrada' }) closed: boolean;
+}
+
 export class SessionSummaryDto {
   @ApiProperty({ description: 'Id del dispositivo (familia de sesión)' }) id: string;
   @ApiProperty() current: boolean;

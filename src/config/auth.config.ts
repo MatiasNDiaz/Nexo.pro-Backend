@@ -15,6 +15,8 @@ export function buildCookieNames(secure: boolean) {
     oauth: secure ? '__Secure-nx_oauth' : 'nx_oauth',
     /** Vinculación o registro con Google a medio terminar (ADR 0015). 30 minutos. */
     oauthPending: secure ? '__Secure-nx_oauth_pending' : 'nx_oauth_pending',
+    /** Reconoce el dispositivo para el aviso de inicio de sesión (ADR 0031). 400 días. */
+    device: secure ? '__Secure-nx_device' : 'nx_device',
   };
 }
 
@@ -53,6 +55,8 @@ export const authConfig = registerAs('auth', () => {
         mfa: `${authPath}/mfa`,
         oauth: `${authPath}/google`,
         oauthPending: `${authPath}/google`,
+        // Solo viaja a las rutas de autenticación (login, segundo factor y Google).
+        device: authPath,
       },
     },
     csrfSecret: env.CSRF_SECRET,

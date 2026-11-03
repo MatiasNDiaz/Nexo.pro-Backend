@@ -31,6 +31,7 @@ import {
   MeDto,
   MessageDto,
   MfaRequiredDto,
+  SessionClosedDto,
   SessionResponseDto,
   SessionSummaryDto,
 } from './dto/auth-responses.dto';
@@ -42,6 +43,7 @@ import { requestMeta, type RequestMeta } from './request-meta';
 import { AuthCookiesService } from './services/auth-cookies.service';
 import { AuthService } from './services/auth.service';
 import { CsrfService } from './services/csrf.service';
+import { LoginContextService } from './services/login-context.service';
 import { REGISTER_MESSAGE, RegistrationService } from './services/registration.service';
 import { type ActiveFamily, SessionsService } from './services/sessions.service';
 import { SessionResponderService } from './services/session-responder.service';
@@ -70,6 +72,7 @@ export class AuthController {
     private readonly uploads: UploadsService,
     private readonly responder: SessionResponderService,
     private readonly google: GoogleAuthService,
+    private readonly loginContext: LoginContextService,
     @Inject(securityConfig.KEY) private readonly security: SecurityConfig,
   ) {}
 
@@ -92,7 +95,12 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<SessionResponseDto | MfaRequiredDto> {
-    const result = await this.auth.login(dto.email, dto.password, this.meta(req), dto.captchaToken);
+    const result = await this.auth.login(
+      dto.email,
+      dto.password,
+      this.loginContext.forLogin(req, res),
+      dto.captchaToken,
+    );
     if (result.kind === 'MFA_REQUIRED') {
       const challenge = await this.tokens.signMfaChallenge(result.userId);
       this.cookies.set(res, 'mfa', challenge, 5 * 60);
@@ -117,7 +125,7 @@ export class AuthController {
         message: 'El código no es válido o el paso de verificación venció.',
       });
     }
-    const result = await this.auth.verifyMfa(userId, dto, this.meta(req));
+    const result = await this.auth.verifyMfa(userId, dto, this.loginContext.forLogin(req, res));
     this.cookies.clear(res, 'mfa');
     if (result.kind !== 'SESSION') throw new UnauthorizedException();
     return this.responder.respond(res, result.user, result.issued);
@@ -245,6 +253,20 @@ export class AuthController {
   ): Promise<void> {
     await this.sessions.closeOwnFamily(user, familyId);
     if (familyId === user.familyId) this.cookies.clearSession(res);
+  }
+
+  /**
+   * "No fui yo" del email de dispositivo nuevo (ADR 0031): cierra esa sesión sin estar logueado.
+   * Es POST (los servicios de email abren los enlaces para revisarlos): el enlace lleva a una
+   * página del frontend con un botón.
+   */
+  @Public()
+  @Post('sessions/close-by-link')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: HOUR } })
+  @ApiOkResponse({ type: SessionClosedDto })
+  closeByLink(@Body() dto: TokenDto, @Req() req: Request): Promise<SessionClosedDto> {
+    return this.sessions.closeByLink(dto.token, this.meta(req));
   }
 
   @Public()

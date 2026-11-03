@@ -14,11 +14,13 @@ import { AuthCleanupJob } from './auth-cleanup.job';
 import { AuthCookiesService } from './services/auth-cookies.service';
 import { AuthService } from './services/auth.service';
 import { CsrfService } from './services/csrf.service';
+import { LoginContextService } from './services/login-context.service';
 import { MfaService } from './services/mfa.service';
 import { OneTimeTokensService } from './services/one-time-tokens.service';
 import { PasswordService } from './services/password.service';
 import { RegistrationService } from './services/registration.service';
 import { SessionsService } from './services/sessions.service';
+import { SessionCloseLinkService } from './services/session-close-link.service';
 import { SessionResponderService } from './services/session-responder.service';
 import { TokenService } from './services/token.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -49,6 +51,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     AuthMailListener,
     GoogleAuthService,
     AuthCleanupJob,
+    LoginContextService,
+    SessionCloseLinkService,
   ],
   exports: [CsrfService, SessionsService, PasswordService, AuthCookiesService, TokenService],
 })

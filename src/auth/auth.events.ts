@@ -11,7 +11,21 @@ export const AuthEvents = {
   ACCOUNT_DELETION_SCHEDULED: 'account.deletion-scheduled',
   /** Confirmar por email la vinculación con Google (ADR 0015). */
   GOOGLE_LINK_REQUESTED: 'auth.google-link-requested',
+  /** Inicio de sesión desde un dispositivo que la cuenta no usó antes (ADR 0031). */
+  NEW_DEVICE_LOGIN: 'auth.new-device-login',
 } as const;
+
+export interface NewDeviceLoginEvent {
+  email: string;
+  firstName: string;
+  userId: string;
+  /** Familia de sesión (dispositivo) que se puede cerrar desde el email. */
+  familyId: string;
+  at: Date;
+  userAgent: string | null;
+  /** Ciudad aproximada: solo para el email, no se guarda. */
+  approximateLocation: string | null;
+}
 
 export interface AccountDeletionScheduledEvent {
   email: string;

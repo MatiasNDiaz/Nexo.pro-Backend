@@ -88,6 +88,7 @@ recurso (anti-IDOR) la valida cada servicio; ver `docs/revision-seguridad.md`.
 | `POST /api/v1/auth/register` | Público | — | No | Sí | 5/min |
 | `GET /api/v1/auth/sessions` | Cualquier rol | PENDING_VERIFICATION, ACTIVE, SUSPENDED, BANNED | — | — | global |
 | `DELETE /api/v1/auth/sessions/:id` | Cualquier rol | PENDING_VERIFICATION, ACTIVE, SUSPENDED, BANNED | Sí | Sí | global |
+| `POST /api/v1/auth/sessions/close-by-link` | Público | — | No | Sí | 10/h |
 | `GET /api/v1/catalog/professionals` | Público | — | — | — | global |
 | `GET /api/v1/catalog/professionals/:slug` | Público | — | — | — | 30/min |
 | `GET /api/v1/catalog/professionals/:slug/reviews` | Público | — | — | — | global |

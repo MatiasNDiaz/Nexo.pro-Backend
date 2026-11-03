@@ -12,6 +12,7 @@ import {
   emailVerificationMail,
   FRONTEND_PATHS,
   googleLinkMail,
+  newDeviceLoginMail,
   passwordChangedMail,
   passwordResetMail,
 } from './auth-mail.templates';
@@ -19,9 +20,12 @@ import {
   type AccountDeletionScheduledEvent,
   type AlreadyRegisteredEvent,
   AuthEvents,
+  type NewDeviceLoginEvent,
   type TokenMailEvent,
   type UserMailEvent,
 } from './auth.events';
+import { describeDevice } from './device-description';
+import { SessionCloseLinkService } from './services/session-close-link.service';
 
 /**
  * Envía los emails de autenticación. Los enlaces se arman con FRONTEND_URL fija (nunca con el
@@ -35,6 +39,7 @@ export class AuthMailListener {
   constructor(
     @Inject(MAIL_PROVIDER) private readonly mail: MailProvider,
     @Inject(authConfig.KEY) private readonly config: AuthConfig,
+    private readonly closeLinks: SessionCloseLinkService,
   ) {}
 
   @OnEvent(AuthEvents.EMAIL_VERIFICATION_REQUESTED, { promisify: true })
@@ -64,6 +69,19 @@ export class AuthMailListener {
     return this.send(
       accountDeletionScheduledMail(event.email, event.firstName, event.deletionScheduledFor),
     );
+  }
+
+  /** Dispositivo nuevo (ADR 0031), con el enlace firmado para cerrar esa sesión. */
+  @OnEvent(AuthEvents.NEW_DEVICE_LOGIN, { promisify: true })
+  onNewDeviceLogin(event: NewDeviceLoginEvent): Promise<void> {
+    const token = this.closeLinks.issue({ userId: event.userId, familyId: event.familyId });
+    const details = {
+      at: event.at,
+      device: describeDevice(event.userAgent),
+      location: event.approximateLocation,
+    };
+    const link = this.link(FRONTEND_PATHS.closeSession, token);
+    return this.send(newDeviceLoginMail(event.email, event.firstName, details, link));
   }
 
   @OnEvent(AuthEvents.GOOGLE_LINK_REQUESTED, { promisify: true })

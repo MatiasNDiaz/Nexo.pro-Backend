@@ -27,6 +27,8 @@ const PUBLIC_ROUTES = new Set([
   'POST /api/v1/auth/email/verify',
   'POST /api/v1/auth/password/forgot',
   'POST /api/v1/auth/password/reset',
+  // "No fui yo" del email de dispositivo nuevo (ADR 0031): autenticado por el enlace firmado.
+  'POST /api/v1/auth/sessions/close-by-link',
   // Login con Google (ADR 0015): antes de tener sesión.
   'GET /api/v1/auth/google',
   'GET /api/v1/auth/google/callback',

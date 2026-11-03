@@ -37,9 +37,9 @@ import {
   OAuthProviderName,
   OAuthRequestKind,
 } from '../entities/auth-identity.entity';
-import { requestMeta } from '../request-meta';
 import { AuthService } from '../services/auth.service';
 import { AuthCookiesService } from '../services/auth-cookies.service';
+import { LoginContextService } from '../services/login-context.service';
 import { RegistrationService } from '../services/registration.service';
 import { SessionResponderService } from '../services/session-responder.service';
 import type { GooglePendingDto, GoogleRegisterDto } from './google-auth.dto';
@@ -93,6 +93,7 @@ export class GoogleAuthService {
     @Inject(authConfig.KEY) private readonly config: AuthConfig,
     @Inject(securityConfig.KEY) private readonly security: SecurityConfig,
     @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
+    private readonly loginContext: LoginContextService,
   ) {
     this.keys = new Map([[security.encryptionKeyVersion, security.encryptionKey]]);
   }
@@ -428,7 +429,7 @@ export class GoogleAuthService {
   }
 
   private async openSession(req: Request, res: Response, user: User): Promise<SessionResponseDto> {
-    const meta = requestMeta(req, this.security.hmacKey);
+    const meta = this.loginContext.forLogin(req, res);
     const issued = await this.auth.startSession(user, meta);
     await this.auth.recordLogin(user.id, true, meta, 'GOOGLE');
     return this.responder.respond(res, user, issued);
