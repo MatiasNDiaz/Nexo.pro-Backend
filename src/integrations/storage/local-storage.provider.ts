@@ -93,6 +93,11 @@ export class LocalStorageProvider implements StorageProvider {
     return this.contentPath(fileId);
   }
 
+  /** En disco no hay enlaces firmados: la API entrega el contenido después de autorizar. */
+  privateUrl(): null {
+    return null;
+  }
+
   private contentPath(fileId: string): string {
     return `${this.apiBasePath}/uploads/${fileId}/content`;
   }

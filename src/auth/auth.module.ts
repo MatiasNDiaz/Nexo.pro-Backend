@@ -48,6 +48,6 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     AuthMailListener,
     GoogleAuthService,
   ],
-  exports: [CsrfService, SessionsService, PasswordService, AuthCookiesService],
+  exports: [CsrfService, SessionsService, PasswordService, AuthCookiesService, TokenService],
 })
 export class AuthModule {}

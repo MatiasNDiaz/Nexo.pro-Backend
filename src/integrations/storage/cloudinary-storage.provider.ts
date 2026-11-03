@@ -1,6 +1,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { FileKind, StorageProviderCode } from '../../uploads/file.enums';
 import {
+  type Access,
   type StorageProvider,
   type StoredObjectInfo,
   type UploadTarget,
@@ -74,6 +75,8 @@ export class CloudinaryStorageProvider implements StorageProvider {
       timestamp: Math.floor(Date.now() / 1000),
       allowed_formats: ALLOWED_FORMATS[target.kind],
       overwrite: 'false',
+      // Los privados se suben como `authenticated`: no tienen URL pública.
+      ...(target.access === 'private' && { type: 'authenticated' }),
     };
     const signature = cloudinary.utils.api_sign_request(params, this.credentials.apiSecret);
     return {
@@ -89,11 +92,16 @@ export class CloudinaryStorageProvider implements StorageProvider {
     };
   }
 
-  async inspect(storageKey: string, kind: FileKind): Promise<StoredObjectInfo | null> {
+  async inspect(
+    storageKey: string,
+    kind: FileKind,
+    access: Access,
+  ): Promise<StoredObjectInfo | null> {
     let resource: CloudinaryResource;
     try {
       resource = (await cloudinary.api.resource(storageKey, {
         resource_type: RESOURCE_TYPE[kind],
+        type: DELIVERY_TYPE[access],
       })) as CloudinaryResource;
     } catch (error) {
       if (httpCodeOf(error) === 404) return null;
@@ -109,9 +117,10 @@ export class CloudinaryStorageProvider implements StorageProvider {
     };
   }
 
-  async delete(storageKey: string, kind: FileKind): Promise<void> {
+  async delete(storageKey: string, kind: FileKind, access: Access): Promise<void> {
     await cloudinary.uploader.destroy(storageKey, {
       resource_type: RESOURCE_TYPE[kind],
+      type: DELIVERY_TYPE[access],
       invalidate: true,
     });
   }
@@ -125,7 +134,21 @@ export class CloudinaryStorageProvider implements StorageProvider {
       urlAnalytics: false,
     });
   }
+
+  privateUrl(storageKey: string, kind: FileKind, mimeType: string, ttlSec: number): string {
+    const format = Object.entries(MIME_BY_FORMAT).find(([, mime]) => mime === mimeType)?.[0] ?? '';
+    return cloudinary.utils.private_download_url(storageKey, format, {
+      resource_type: RESOURCE_TYPE[kind],
+      type: 'authenticated',
+      expires_at: Math.floor(Date.now() / 1000) + ttlSec,
+    });
+  }
 }
+
+const DELIVERY_TYPE: Record<Access, 'upload' | 'authenticated'> = {
+  public: 'upload',
+  private: 'authenticated',
+};
 
 /** El SDK rechaza con `{ error: { http_code } }` (o `{ http_code }` según la versión). */
 function httpCodeOf(error: unknown): number | undefined {

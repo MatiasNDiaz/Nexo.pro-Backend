@@ -185,6 +185,18 @@ export class CatalogService {
     };
   }
 
+  /** ¿El profesional aparece en el catálogo? (solo a esos se les puede escribir, ADR 0024). */
+  async isListed(userId: string): Promise<boolean> {
+    const rows: unknown[] = await this.dataSource.query(
+      `SELECT 1 FROM professional_profiles p
+         JOIN users u ON u.id = p.user_id
+         ${LIVE_SUBSCRIPTION}
+        WHERE u.id = $1 AND ${VISIBLE}`,
+      [userId],
+    );
+    return rows.length > 0;
+  }
+
   async profile(slug: string, now = new Date()): Promise<PublicProfileDto> {
     const rows: CatalogRow[] = await this.dataSource.query(
       `SELECT p.id, p.user_id, p.slug, u.first_name, u.last_name, p.business_name, p.bio,

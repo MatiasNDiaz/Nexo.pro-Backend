@@ -3,10 +3,11 @@ import { UploadsModule } from '../uploads/uploads.module';
 import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
 
-/** Catálogo público. Solo lectura: no lo importa ningún otro módulo. */
+/** Catálogo público. El chat lo usa para saber a quién se le puede escribir. */
 @Module({
   imports: [UploadsModule],
   controllers: [CatalogController],
   providers: [CatalogService],
+  exports: [CatalogService],
 })
 export class CatalogModule {}

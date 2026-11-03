@@ -8,9 +8,13 @@ import type { FileKind, StorageProviderCode } from '../../uploads/file.enums';
  */
 export const STORAGE_PROVIDER = Symbol('STORAGE_PROVIDER');
 
+/** Privado: solo se entrega con un enlace firmado de vida corta (adjuntos del chat, ADR 0024). */
+export type Access = 'public' | 'private';
+
 export interface UploadTarget {
   storageKey: string;
   kind: FileKind;
+  access: Access;
 }
 
 /** Cómo sube el navegador: `fields` va como multipart junto al archivo (campo `file`). */
@@ -39,13 +43,19 @@ export interface StorageProvider {
   createUploadTicket(target: UploadTarget): UploadTicket;
 
   /** Null si el archivo todavía no se subió. */
-  inspect(storageKey: string, kind: FileKind): Promise<StoredObjectInfo | null>;
+  inspect(storageKey: string, kind: FileKind, access: Access): Promise<StoredObjectInfo | null>;
 
   /** Idempotente: borrar algo que no existe no es un error. */
-  delete(storageKey: string, kind: FileKind): Promise<void>;
+  delete(storageKey: string, kind: FileKind, access: Access): Promise<void>;
 
   /** URL pública (solo archivos PUBLIC). */
   publicUrl(storageKey: string, kind: FileKind, fileId: string): string;
+
+  /**
+   * Enlace firmado de vida corta para un archivo privado, o null si la API tiene que entregar el
+   * contenido ella misma (adaptador local).
+   */
+  privateUrl(storageKey: string, kind: FileKind, mimeType: string, ttlSec: number): string | null;
 }
 
 /** Vida del ticket de subida. Cloudinary acepta firmas de hasta 1 hora. */

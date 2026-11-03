@@ -19,7 +19,11 @@ describe('CloudinaryStorageProvider', () => {
     const storageKey = provider.storageKeyFor('avatars', 'abc');
     expect(storageKey).toBe('nexo-test/avatars/abc');
 
-    const ticket = provider.createUploadTicket({ storageKey, kind: FileKind.IMAGE });
+    const ticket = provider.createUploadTicket({
+      storageKey,
+      kind: FileKind.IMAGE,
+      access: 'public',
+    });
     expect(ticket.method).toBe('POST');
     expect(ticket.url).toBe('https://api.cloudinary.com/v1_1/nube-test/image/upload');
     const { signature, api_key, ...signed } = ticket.fields;
@@ -47,6 +51,7 @@ describe('CloudinaryStorageProvider', () => {
     const ticket = provider.createUploadTicket({
       storageKey: 'nexo-test/x/y',
       kind: FileKind.VIDEO,
+      access: 'public',
     });
     expect(ticket.url).toBe('https://api.cloudinary.com/v1_1/nube-test/video/upload');
     expect(ticket.fields.allowed_formats).toBe('mp4,mov');
@@ -56,34 +61,55 @@ describe('CloudinaryStorageProvider', () => {
     const resource = jest
       .spyOn(cloudinary.api, 'resource')
       .mockResolvedValue({ format: 'mp4', bytes: 2048, duration: 14.2 });
-    await expect(provider.inspect('nexo-test/x/y', FileKind.VIDEO)).resolves.toEqual({
+    await expect(provider.inspect('nexo-test/x/y', FileKind.VIDEO, 'public')).resolves.toEqual({
       mimeType: 'video/mp4',
       sizeBytes: 2048,
       durationMs: 14200,
     });
-    expect(resource).toHaveBeenCalledWith('nexo-test/x/y', { resource_type: 'video' });
+    expect(resource).toHaveBeenCalledWith('nexo-test/x/y', {
+      resource_type: 'video',
+      type: 'upload',
+    });
 
     resource.mockResolvedValue({ format: 'gif', bytes: 10 });
-    expect((await provider.inspect('nexo-test/x/y', FileKind.IMAGE))?.mimeType).toBeNull();
+    expect(
+      (await provider.inspect('nexo-test/x/y', FileKind.IMAGE, 'public'))?.mimeType,
+    ).toBeNull();
   });
 
   it('inspect devuelve null si el archivo no se subió y propaga otros errores', async () => {
     const resource = jest.spyOn(cloudinary.api, 'resource');
     resource.mockRejectedValue({ error: { http_code: 404, message: 'Resource not found' } });
-    await expect(provider.inspect('nexo-test/x/y', FileKind.IMAGE)).resolves.toBeNull();
+    await expect(provider.inspect('nexo-test/x/y', FileKind.IMAGE, 'public')).resolves.toBeNull();
     resource.mockRejectedValue({ error: { http_code: 500 } });
-    await expect(provider.inspect('nexo-test/x/y', FileKind.IMAGE)).rejects.toBeDefined();
+    await expect(provider.inspect('nexo-test/x/y', FileKind.IMAGE, 'public')).rejects.toBeDefined();
   });
 
   it('borra con invalidación de caché y arma URLs https', async () => {
     const destroy = jest.spyOn(cloudinary.uploader, 'destroy').mockResolvedValue({ result: 'ok' });
-    await provider.delete('nexo-test/x/y', FileKind.IMAGE);
+    await provider.delete('nexo-test/x/y', FileKind.IMAGE, 'public');
     expect(destroy).toHaveBeenCalledWith('nexo-test/x/y', {
       resource_type: 'image',
+      type: 'upload',
       invalidate: true,
     });
     expect(provider.publicUrl('nexo-test/x/y', FileKind.IMAGE)).toMatch(
       /^https:\/\/res\.cloudinary\.com\/nube-test\/image\/upload\/(v1\/)?nexo-test\/x\/y$/,
     );
+  });
+
+  it('los privados se suben como authenticated y se entregan con enlace firmado que vence', () => {
+    const ticket = provider.createUploadTicket({
+      storageKey: 'nexo-test/chat/abc',
+      kind: FileKind.IMAGE,
+      access: 'private',
+    });
+    expect(ticket.fields.type).toBe('authenticated');
+    const url = new URL(
+      provider.privateUrl('nexo-test/chat/abc', FileKind.IMAGE, 'image/png', 300),
+    );
+    expect(url.searchParams.get('type')).toBe('authenticated');
+    expect(Number(url.searchParams.get('expires_at'))).toBeGreaterThan(Date.now() / 1000);
+    expect(url.toString()).not.toContain(credentials.apiSecret);
   });
 });

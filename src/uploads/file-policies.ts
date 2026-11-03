@@ -67,6 +67,15 @@ export const FILE_POLICIES: Record<FilePurpose, FilePolicy> = {
     maxBytes: (kind, plan) =>
       !plan ? 0 : kind === FileKind.VIDEO ? plan.maxVideoBytes : plan.maxImageBytes,
   },
+  [FilePurpose.CHAT_ATTACHMENT]: {
+    kinds: [FileKind.IMAGE, FileKind.VIDEO],
+    roles: [UserRole.CUSTOMER, UserRole.PROFESSIONAL],
+    visibility: FileVisibility.PRIVATE,
+    folder: 'chat',
+    needsPlan: false,
+    // Pesos de Basic (ADR 0024).
+    maxBytes: (kind) => (kind === FileKind.VIDEO ? 30 * MB : 5 * MB),
+  },
   [FilePurpose.CERTIFICATE]: {
     kinds: [FileKind.IMAGE, FileKind.DOCUMENT],
     roles: [UserRole.PROFESSIONAL],

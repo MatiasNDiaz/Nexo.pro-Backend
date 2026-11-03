@@ -8,6 +8,10 @@ import { LoggerModule } from 'nestjs-pino';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { ChatModule } from './chat/chat.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { RealtimeModule } from './realtime/realtime.module';
+import { RequestsModule } from './requests/requests.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { AccountStateGuard } from './common/guards/account-state.guard';
 import { CsrfGuard } from './common/guards/csrf.guard';
@@ -91,6 +95,10 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
     SubscriptionsModule,
     ProfessionalsModule,
     CatalogModule,
+    RealtimeModule,
+    NotificationsModule,
+    ChatModule,
+    RequestsModule,
   ],
   providers: [
     // Guards globales, en este orden (plan §9.8). Denegación por defecto: solo `@Public()` pasa

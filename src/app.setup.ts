@@ -7,6 +7,7 @@ import { Logger } from 'nestjs-pino';
 import { REQUEST_ID_HEADER } from './common/logging/logger.options';
 import { type AppConfig, appConfig } from './config/app.config';
 import { type AuthConfig, authConfig } from './config/auth.config';
+import { RealtimeAdapter } from './realtime/realtime.adapter';
 
 /**
  * Opciones con las que se crea la app; las comparten `main.ts` y los tests e2e. `rawBody` guarda
@@ -38,6 +39,9 @@ export function configureApp(app: NestExpressApplication): AppConfig {
     exposedHeaders: [REQUEST_ID_HEADER],
     maxAge: 600,
   });
+
+  // Tiempo real (Socket.IO, ADR 0024): mismos orígenes permitidos que la API.
+  app.useWebSocketAdapter(new RealtimeAdapter(app, config.frontendOrigins));
 
   app.setGlobalPrefix(config.apiPrefix);
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });

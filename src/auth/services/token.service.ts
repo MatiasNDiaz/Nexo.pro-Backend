@@ -54,6 +54,32 @@ export class TokenService {
     );
   }
 
+  /**
+   * Verifica un access token con las mismas reglas que el guard HTTP (HS256, `kid`, iss, aud,
+   * vencimiento). Lo usa la conexión de tiempo real. Devuelve sub y sid, o null.
+   */
+  async verifyAccessToken(token: string): Promise<{ userId: string; sid: string } | null> {
+    try {
+      const header = JSON.parse(
+        Buffer.from(token.split('.')[0] ?? '', 'base64url').toString('utf8'),
+      ) as { kid?: unknown };
+      const secret = this.secretForKid(header.kid);
+      if (!secret) return null;
+      const payload = await this.jwt.verifyAsync<{ sub?: unknown; sid?: unknown }>(token, {
+        secret,
+        algorithms: ['HS256'],
+        issuer: this.config.jwt.issuer,
+        audience: this.config.jwt.audience,
+        clockTolerance: 30,
+      });
+      return typeof payload.sub === 'string' && typeof payload.sid === 'string'
+        ? { userId: payload.sub, sid: payload.sid }
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** Paso intermedio del login del admin: solo sirve para `POST /auth/mfa/verify`. */
   signMfaChallenge(userId: string): Promise<string> {
     return this.jwt.signAsync(

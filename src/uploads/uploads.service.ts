@@ -14,6 +14,7 @@ import { DataSource, EntityManager, In, LessThan, Not } from 'typeorm';
 import type { AuthUser } from '../common/decorators';
 import { LocalStorageProvider } from '../integrations/storage/local-storage.provider';
 import {
+  type Access,
   STORAGE_PROVIDER,
   type StorageProvider,
   type StoredObjectInfo,
@@ -30,6 +31,10 @@ import {
   PENDING_UPLOAD_TTL_MS,
 } from './file-policies';
 import { FileKind, FilePurpose, FileStatus, FileVisibility } from './file.enums';
+
+/** Privado o público según el propósito (no según la fila: el admin puede ocultar uno público). */
+const accessOf = (file: StoredFile): Access =>
+  FILE_POLICIES[file.purpose].visibility === FileVisibility.PRIVATE ? 'private' : 'public';
 
 const notFound = () =>
   new NotFoundException({ code: 'FILE_NOT_FOUND', message: 'El archivo no existe.' });
@@ -123,6 +128,7 @@ export class UploadsService {
     const ticket = this.storage.createUploadTicket({
       storageKey: saved.storageKey,
       kind: saved.kind,
+      access: accessOf(saved),
     });
     return { file: this.toResponse(saved), upload: { ...ticket, maxBytes } };
   }
@@ -136,7 +142,7 @@ export class UploadsService {
 
     // La consulta al proveedor va fuera de cualquier transacción; las actualizaciones son
     // condicionales (`status = PENDING_UPLOAD`) para que dos confirmaciones no se pisen.
-    const info = await this.storage.inspect(file.storageKey, file.kind);
+    const info = await this.storage.inspect(file.storageKey, file.kind, accessOf(file));
     if (!info) {
       throw new ConflictException({
         code: 'UPLOAD_NOT_RECEIVED',
@@ -248,6 +254,21 @@ export class UploadsService {
     await local.write(file.storageKey, data);
   }
 
+  /**
+   * Entrega un archivo privado ya autorizado por el llamador (adjuntos del chat): un enlace firmado
+   * de 5 minutos (Cloudinary) o el contenido (adaptador local).
+   */
+  async privateContent(
+    file: StoredFile,
+  ): Promise<{ redirectUrl: string } | { data: Buffer; mimeType: string }> {
+    if (file.status !== FileStatus.READY || !file.mimeType) throw notFound();
+    const url = this.storage.privateUrl(file.storageKey, file.kind, file.mimeType, 5 * 60);
+    if (url) return { redirectUrl: url };
+    const data = await this.localStorage().read(file.storageKey);
+    if (!data) throw notFound();
+    return { data, mimeType: file.mimeType };
+  }
+
   /** Contenido de un archivo público del adaptador local (solo desarrollo y tests). */
   async readLocalPublic(fileId: string): Promise<{ data: Buffer; mimeType: string }> {
     const local = this.localStorage();
@@ -312,7 +333,7 @@ export class UploadsService {
   async deleteFromStorage(files: StoredFile[]): Promise<void> {
     for (const file of files) {
       try {
-        await this.storage.delete(file.storageKey, file.kind);
+        await this.storage.delete(file.storageKey, file.kind, accessOf(file));
       } catch {
         this.logger.warn(`No se pudo borrar del almacenamiento el archivo ${file.id}`);
       }
