@@ -41,6 +41,11 @@ const PUBLIC_ROUTES = new Set([
   'POST /api/v1/webhooks/identity',
   // Avisos de Mercado Pago: autenticados por la firma x-signature (ADR 0026).
   'POST /api/v1/webhooks/payments',
+  // Reputación y foro (ADR 0028): lectura pública.
+  'GET /api/v1/catalog/professionals/:slug/reviews',
+  'GET /api/v1/platform-reviews',
+  'GET /api/v1/forum/posts',
+  'GET /api/v1/forum/posts/:id',
 ]);
 
 interface RouteLayer {
