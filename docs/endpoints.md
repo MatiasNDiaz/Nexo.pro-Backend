@@ -37,6 +37,10 @@ recurso (anti-IDOR) la valida cada servicio; ver `docs/revision-seguridad.md`.
 | `GET /api/v1/admin/reports/:id/conversation` | ADMIN | ACTIVE | — | — | global |
 | `POST /api/v1/admin/reports/:id/resolve` | ADMIN | ACTIVE | Sí | Sí | global |
 | `POST /api/v1/admin/reports/:id/review` | ADMIN | ACTIVE | Sí | Sí | global |
+| `POST /api/v1/admin/revenue/exports` | ADMIN | ACTIVE | Sí | Sí | 10/h |
+| `GET /api/v1/admin/revenue/payments` | ADMIN | ACTIVE | — | — | global |
+| `GET /api/v1/admin/revenue/registrations` | ADMIN | ACTIVE | — | — | global |
+| `GET /api/v1/admin/revenue/summary` | ADMIN | ACTIVE | — | — | global |
 | `POST /api/v1/admin/reviews/:id/hide` | ADMIN | ACTIVE | Sí | Sí | global |
 | `POST /api/v1/admin/reviews/:id/restore` | ADMIN | ACTIVE | Sí | Sí | global |
 | `POST /api/v1/admin/sanctions/:id/lift` | ADMIN | ACTIVE | Sí | Sí | global |
