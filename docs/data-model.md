@@ -234,6 +234,8 @@ Etapa 12: índice `ix_auth_sessions_expires_at` (limpieza diaria) y `stored_file
 
 Etapa 13.1 (ADR 0030): enum `payment_kind` (`NEW`, `RENEWAL`, `REACTIVATION`, `UPGRADE`) y columna `payments.kind`, fijada al aplicarse el pago (check `ck_payments_kind`: solo en pagos aplicados). `payments.money_returned_at`: cuándo se devolvió la plata, obligatoria en `REFUNDED` y `CHARGED_BACK` (check `ck_payments_money_returned`); un reembolso que después pasa a contracargo conserva la primera fecha. Índices parciales `ix_payments_approved_at` y `ix_payments_money_returned_at`, e `ix_users_created_at`. La migración completó los pagos existentes con la misma regla. Evento auditado nuevo: `REVENUE_EXPORTED` (reporte, filtros y cantidad de filas, sin datos personales).
 
+Etapa 13.2 (ADR 0031): `auth_sessions.device_hash` (HMAC de la cookie `nx_device`; se copia en cada rotación de la familia). Las sesiones anteriores quedan sin hash. La ciudad aproximada no se guarda. Evento auditado nuevo: `SESSION_CLOSED_FROM_EMAIL` (familia y si estaba abierta, con la IP seudonimizada).
+
 Al anonimizar una cuenta, sus
 archivos pasan a `DELETED` y se borran del proveedor.
 

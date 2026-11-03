@@ -48,6 +48,24 @@ DELETE ON TABLES` y `USAGE, SELECT ON SEQUENCES` para las tablas que creen las m
 6. **Dominio:** `api.<dominio>` al servicio de la API; Railway gestiona el certificado.
 7. **Verificar:** `GET https://api.<dominio>/api/v1/health/ready` responde 200.
 
+### Cloudflare delante de la API (ciudad aproximada, ADR 0031)
+
+Opcional: sin esto, el email de dispositivo nuevo dice "ubicación no disponible".
+
+1. Pasar el DNS del dominio a Cloudflare y crear `api` como CNAME al dominio de Railway,
+   **con proxy** (nube naranja). SSL/TLS en modo _Full (strict)_.
+2. _Rules → Managed Transforms_: activar **Add visitor location headers** (`cf-ipcity`,
+   `cf-region`, `cf-ipcountry`).
+3. _Rules → Transform Rules → Modify Request Header_, para el host `api.<dominio>`: agregar
+   `x-nexo-edge-secret` con un valor al azar de 32 caracteres o más. El mismo valor va en
+   `CLOUDFLARE_EDGE_SECRET`. Sin ese encabezado la API ignora la ciudad (cualquiera puede inventar
+   `cf-ipcity` llamando directo a Railway).
+4. **IP real:** con Cloudflare y Railway hay dos proxies, así que `TRUST_PROXY=2`; con `1` la API
+   vería la IP de Cloudflare y el límite por IP sería uno solo para todos. Con `2`, quien llame
+   directo a Railway (sin pasar por Cloudflare) puede inventar su IP: **probarlo en staging** y,
+   antes de producción, decidir si se bloquea el acceso directo (pendiente).
+5. Verificar: iniciar sesión desde otro navegador y revisar que el email traiga la ciudad.
+
 ### Volver atrás un deploy
 
 Railway permite volver al deploy anterior desde el panel. Si el deploy incluía una migración, antes

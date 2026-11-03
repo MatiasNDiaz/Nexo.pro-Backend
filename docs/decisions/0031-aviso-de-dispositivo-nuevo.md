@@ -1,6 +1,6 @@
 # ADR 0031 — Aviso por email de inicio de sesión desde un dispositivo nuevo
 
-- **Fecha:** 03/11/2026 · **Estado:** aprobada (implementación en la etapa 13.2)
+- **Fecha:** 03/11/2026 · **Estado:** aprobada e implementada (etapa 13.2)
 
 **Decisión.**
 
@@ -31,3 +31,10 @@
 **Consecuencias.** Una columna `auth_sessions.device_hash char(64) NULL`. Se reusa el motivo de
 cierre `SESSION_CLOSED`. La cookie `nx_device` es estrictamente necesaria por seguridad: va en la
 política de privacidad (revisión legal).
+
+**Detalles de la implementación.** La cookie solo viaja a `/api/v1/auth` y se renueva en cada inicio
+de sesión; en la base va su HMAC (con `DATA_HMAC_KEY`), copiado en cada renovación de la sesión. Las
+sesiones anteriores a la 13.2 no tienen hash: el primer inicio de sesión de cada dispositivo después
+del deploy avisa una vez. El enlace pesa 70 caracteres (familia, cuenta y vencimiento en binario más
+128 bits de firma). Con Cloudflare delante hay dos proxies: `TRUST_PROXY=2` (pasos y riesgo en
+`docs/operacion.md`).

@@ -21,8 +21,8 @@ Detalle de alcance, bloqueos y criterios de aceptación: plan §16. Una rama por
 | 10     | Reputación y comunidad: reseñas, favoritos, foro (ADR 0027 y 0028)                                                                         | ✅ Aprobada                      |
 | 11     | Moderación, soporte, administración y auditoría (ADR 0029)                                                                                 | ✅ Aprobada                      |
 | 12     | Hardening y preparación para producción (`docs/revision-seguridad.md`, `docs/operacion.md`)                                                | ✅ Aprobada                      |
-| 13.1   | Panel de ingresos del admin: pagos, registros, resumen neto y CSV auditado (ADR 0030)                                                      | En revisión                      |
-| 13.2   | Email por inicio de sesión desde un dispositivo nuevo (ADR 0031)                                                                           | Pendiente                        |
+| 13.1   | Panel de ingresos del admin: pagos, registros, resumen neto y CSV auditado (ADR 0030)                                                      | ✅ Aprobada                      |
+| 13.2   | Email por inicio de sesión desde un dispositivo nuevo (ADR 0031)                                                                           | En revisión                      |
 | 13     | Resto de premium y avanzadas: métricas, push, WhatsApp, chatbot/agenda, identidad automática (a proponer)                                  | Pendiente                        |
 
 Google OAuth estaba en la etapa 13 (plan §16); el fundador lo adelantó a 7B.

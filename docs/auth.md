@@ -24,6 +24,7 @@ lo integra el frontend Next.js.
 | `nx_mfa`           | `__Secure-nx_mfa`           | Paso intermedio del login del admin         | `/api/v1/auth/mfa`    | 5 min                                       |
 | `nx_oauth`         | `__Secure-nx_oauth`         | state, nonce y PKCE de Google (cifrado)     | `/api/v1/auth/google` | 10 min                                      |
 | `nx_oauth_pending` | `__Secure-nx_oauth_pending` | Vinculación o registro con Google pendiente | `/api/v1/auth/google` | 30 min                                      |
+| `nx_device`        | `__Secure-nx_device`        | Valor al azar que reconoce el dispositivo   | `/api/v1/auth`        | 400 días (se renueva al iniciar sesión)     |
 
 Todas: `HttpOnly`, `SameSite=Lax`, **sin `Domain`** (solo las recibe `api.<dominio>`), `Secure` en
 producción (`COOKIE_SECURE=true`, obligatorio). Se borran con exactamente los mismos atributos. Los
@@ -105,12 +106,23 @@ sequenceDiagram
 
 ### Logout y sesiones
 
-| Acción           | Endpoint                    | Efecto                                                          |
-| ---------------- | --------------------------- | --------------------------------------------------------------- |
-| Logout           | `POST /auth/logout`         | Revoca el dispositivo actual y borra las cookies. Siempre `204` |
-| Cerrar todo      | `POST /auth/logout-all`     | Revoca todas las sesiones del usuario                           |
-| Ver dispositivos | `GET /auth/sessions`        | Lista con `current: true` en el actual                          |
-| Cerrar uno       | `DELETE /auth/sessions/:id` | Solo propios (404 si no)                                        |
+| Acción           | Endpoint                            | Efecto                                                           |
+| ---------------- | ----------------------------------- | ---------------------------------------------------------------- |
+| Logout           | `POST /auth/logout`                 | Revoca el dispositivo actual y borra las cookies. Siempre `204`  |
+| Cerrar todo      | `POST /auth/logout-all`             | Revoca todas las sesiones del usuario                            |
+| Ver dispositivos | `GET /auth/sessions`                | Lista con `current: true` en el actual                           |
+| Cerrar uno       | `DELETE /auth/sessions/:id`         | Solo propios (404 si no)                                         |
+| "No fui yo"      | `POST /auth/sessions/close-by-link` | Público, con el token del email de dispositivo nuevo. `{closed}` |
+
+**Aviso de dispositivo nuevo (ADR 0031).** Al iniciar sesión (contraseña, segundo factor del admin o
+Google) la API lee o crea la cookie `nx_device` y guarda solo su HMAC en la sesión. Si la cuenta no
+tiene ninguna sesión guardada con ese dispositivo, y no es su primer inicio de sesión, manda un email
+con la fecha y hora, el navegador y el sistema, la ciudad aproximada (Cloudflare, no se guarda) y un
+enlace a `<FRONTEND_URL>/cerrar-sesion?token=…` (vence en 7 días). **Esa página no cierra nada al
+abrirse** (los servicios de email abren los enlaces para revisarlos): muestra un botón que hace
+`POST /auth/sessions/close-by-link {token}` y después sugiere cambiar la contraseña. Token vencido o
+adulterado: `400 INVALID_TOKEN`. Borrar las cookies del navegador hace que el próximo inicio de
+sesión cuente como dispositivo nuevo.
 
 También se revocan sesiones al restablecer la contraseña (todas), al cambiarla (todas menos la actual)
 al detectar reutilización de un refresh, al suspender o banear, al cambiar el rol, al dar de baja la

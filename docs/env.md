@@ -101,11 +101,12 @@ La vuelta del checkout va a `FRONTEND_URL/suscripcion/resultado` (el frontend co
 
 ## Antiabuso y monitoreo (etapa 12)
 
-| Variable                | Obligatoria | Defecto | Descripción                                                                                                                   |
-| ----------------------- | ----------- | ------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `PASSWORD_BREACH_CHECK` | No          | `false` | Rechaza contraseñas filtradas (Have I Been Pwned; solo viajan 5 caracteres del SHA-1). Si el servicio no responde, deja pasar |
-| `TURNSTILE_SECRET_KEY`  | No          | —       | **Secreto** de Cloudflare Turnstile. Con él, CAPTCHA en registro, contacto y login tras 3 fallos por IP (`CAPTCHA_REQUIRED`)  |
-| `SENTRY_DSN`            | No          | —       | Reporta los errores 500 a Sentry sin datos personales. Sin él, apagado                                                        |
+| Variable                 | Obligatoria | Defecto | Descripción                                                                                                                                                                                    |
+| ------------------------ | ----------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PASSWORD_BREACH_CHECK`  | No          | `false` | Rechaza contraseñas filtradas (Have I Been Pwned; solo viajan 5 caracteres del SHA-1). Si el servicio no responde, deja pasar                                                                  |
+| `TURNSTILE_SECRET_KEY`   | No          | —       | **Secreto** de Cloudflare Turnstile. Con él, CAPTCHA en registro, contacto y login tras 3 fallos por IP (`CAPTCHA_REQUIRED`)                                                                   |
+| `SENTRY_DSN`             | No          | —       | Reporta los errores 500 a Sentry sin datos personales. Sin él, apagado                                                                                                                         |
+| `CLOUDFLARE_EDGE_SECRET` | No          | —       | **Secreto** (≥ 32) que Cloudflare agrega en `x-nexo-edge-secret`. Con él, la ciudad aproximada de Cloudflare va en el email de dispositivo nuevo (ADR 0031). Sin él: "ubicación no disponible" |
 
 El frontend necesita además la **clave pública** (site key) de Turnstile para mostrar el widget y
 mandar el token en `captchaToken`.
