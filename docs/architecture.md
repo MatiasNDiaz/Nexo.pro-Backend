@@ -13,7 +13,8 @@ Monolito modular NestJS (plan §5–7). Controllers delgados, reglas de negocio 
 | 7.1 Archivos e identidad    | Hecha: archivos (Cloudinary/local) y foto de perfil, verificación de identidad (módulo de referencia), moderación de barrios, tareas programadas                                                         |
 | 7.2 Perfiles y planes       | Hecha: perfil de cliente y profesional, medios, certificados, redes, horarios, personalización, prueba de 30 días con recordatorios, cambio de foto en revisión                                          |
 | 7.3 Catálogo                | Hecha: catálogo público con filtros y orden (ADR 0022), página pública por slug, edición de datos personales (ADR 0021)                                                                                  |
-| 7B y 8–13                   | Pendientes (ver `docs/roadmap.md`, incluye la etapa 7B de login con Google)                                                                                                                              |
+| 7B Login con Google         | Hecha: OpenID Connect con PKCE (adaptador simulado hasta tener credenciales), vinculación con contraseña o email, registro con Google, cuentas sin contraseña                                            |
+| 8–13                        | Pendientes (ver `docs/roadmap.md`, incluye la etapa 7B de login con Google)                                                                                                                              |
 
 ## Estructura actual
 
@@ -48,6 +49,7 @@ src/
 ├── professionals/          # perfil, medios, certificados, redes, horarios, tema; moderación de contenido
 ├── integrations/mail/      # MailProvider + adaptadores consola/memoria
 ├── integrations/storage/   # StorageProvider + Cloudinary / disco local, detección de tipo real
+├── integrations/oauth/     # OAuthProvider + Google (openid-client) / simulado
 ├── integrations/identity/  # IdentityVerificationProvider + manual / simulado (fake)
 ├── catalog/                # catálogo público: búsqueda, orden y página del profesional
 ├── uploads/                # stored_files, tickets de subida, confirmación, foto de perfil, limpieza
@@ -168,3 +170,12 @@ Detalle de cada guard en `docs/authorization.md`. El de suscripción/plan llega 
   medios), sin borrar nada: al volver a subir de plan reaparece.
 - **Email y teléfono solo en el detalle**, con un límite de 30 consultas por minuto por IP (C-19).
 - **Revisión de datos única** (`PROFILE_CHANGE`): foto y nombre pendientes se aprueban o rechazan juntos.
+
+**Etapa 7B**
+
+- **OpenID Connect con `openid-client`** detrás de `OAuthProvider`; el servicio solo ve un perfil
+  (sub, email verificado, nombre). State, nonce y verificador PKCE viajan en una cookie cifrada
+  (AES-256-GCM) de 10 minutos; la URL del callback sale de la configuración, nunca del header `Host`.
+- **`SessionResponderService`**: un solo lugar entrega las cookies de sesión (login, MFA y Google).
+- **La vinculación nunca es automática**: el pedido pendiente guarda solo hashes de tokens y vence a
+  los 30 minutos; vincular con contraseña usa el mismo bloqueo progresivo que el login.

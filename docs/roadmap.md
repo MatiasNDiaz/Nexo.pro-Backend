@@ -14,8 +14,8 @@ Detalle de alcance, bloqueos y criterios de aceptación: plan §16. Una rama por
 | 6      | Autorización y estados de cuenta: suspensión, baneo, cambio de rol, baja, revocación                                                       | ✅ Aprobada                                  |
 | 7.1    | Archivos (Cloudinary + local), foto de perfil, verificación de identidad (módulo de referencia), moderación de barrios, tareas programadas | ✅ Aprobada                                  |
 | 7.2    | Perfiles de cliente y profesional, medios, certificados, personalización, disponibilidad, planes y prueba de 30 días                       | ✅ Aprobada                                  |
-| 7.3    | Catálogo público, filtros y página pública; edición de datos personales (ADR 0021 y 0022)                                                  | 🔄 En revisión                               |
-| **7B** | **Login con Google** para clientes y profesionales (ADR 0015)                                                                              | Pendiente — agendada por el fundador         |
+| 7.3    | Catálogo público, filtros y página pública; edición de datos personales (ADR 0021 y 0022)                                                  | ✅ Aprobada                                  |
+| **7B** | **Login con Google** para clientes y profesionales (ADR 0015)                                                                              | 🔄 En revisión (adaptador simulado)          |
 | 8      | Chat, solicitudes y contrataciones; notificaciones internas y tiempo real                                                                  | Pendiente (requiere aprobar WebSocket, C-14) |
 | 9      | Suscripciones y pagos con Mercado Pago (proveedor confirmado)                                                                              | Pendiente                                    |
 | 10     | Reputación y comunidad: reseñas, favoritos, foro                                                                                           | Pendiente                                    |

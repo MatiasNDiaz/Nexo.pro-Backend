@@ -19,7 +19,7 @@ agrega su parte y la documenta acá.
 Un test de integración compara las entidades con el esquema real que dejan las migraciones; si alguien
 cambia una entidad sin migración (o al revés), falla.
 
-## Diagrama (etapas 4 a 7.3)
+## Diagrama (etapas 4 a 7B)
 
 ```mermaid
 erDiagram
@@ -28,6 +28,8 @@ erDiagram
   neighborhoods |o--o{ neighborhoods : "merged_into_id (alias)"
   neighborhoods |o--o{ users : "barrio donde vive (cliente)"
   users ||--o{ auth_sessions : "abre"
+  users ||--o{ auth_identities : "vincula Google"
+  users |o--o{ oauth_pending_requests : "vinculación pendiente"
   auth_sessions |o--o| auth_sessions : "replaced_by_id"
   users ||--o{ one_time_tokens : "recibe"
   users ||--o| user_mfa_settings : "admin"
@@ -188,9 +190,11 @@ cuántos clientes y zonas se movieron).
 
 `professional_profiles` (etapa 7.2): `slug` único para la URL pública, descripción de hasta 200, tarifa de referencia con su modalidad (las dos o ninguna), estado de atención manual con vencimiento y opción automática por horario (el estado que se muestra se calcula al leerlo) y `theme` con valores de listas cerradas. `subscription_plans` suma `max_image_bytes` y `max_video_bytes` (ADR 0018).
 
+`users.password_hash` es opcional desde la etapa 7B (cuentas creadas con Google, ADR 0023); `ck_users_admin_password` obliga al admin a tener contraseña.
+
 `users.pending_first_name` / `pending_last_name` (etapa 7.3, ADR 0021): nombre nuevo en revisión, los dos o ninguno. La revisión `AVATAR_CHANGE` pasó a llamarse `PROFILE_CHANGE` y cubre foto y nombre.
 
-Eventos auditados nuevos: `USER_DATA_UPDATED` y `PROFESSIONAL_PROFILE_UPDATED` (solo los nombres de los campos, no los valores), `PROFESSIONAL_MEDIA_HIDDEN` / `_RESTORED` y `PROFESSIONAL_CERTIFICATION_HIDDEN` / `_RESTORED`.
+Eventos auditados nuevos: `GOOGLE_LINKED`, `GOOGLE_UNLINKED`, `PASSWORD_SET`, `USER_REGISTERED` con `via` (`PASSWORD` o `GOOGLE`), `USER_DATA_UPDATED` y `PROFESSIONAL_PROFILE_UPDATED` (solo los nombres de los campos, no los valores), `PROFESSIONAL_MEDIA_HIDDEN` / `_RESTORED` y `PROFESSIONAL_CERTIFICATION_HIDDEN` / `_RESTORED`.
 
 Al anonimizar una cuenta, sus
 archivos pasan a `DELETED` y se borran del proveedor.

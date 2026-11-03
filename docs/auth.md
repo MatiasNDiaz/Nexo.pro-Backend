@@ -16,12 +16,14 @@ lo integra el frontend Next.js.
 
 ## Cookies
 
-| Cookie (local) | Cookie (producción) | Contenido                           | Path               | Max-Age                                     |
-| -------------- | ------------------- | ----------------------------------- | ------------------ | ------------------------------------------- |
-| `nx_at`        | `__Host-nx_at`      | Access JWT                          | `/`                | 10 min (admin 5)                            |
-| `nx_rt`        | `__Secure-nx_rt`    | Refresh opaco                       | `/api/v1/auth`     | Inactividad: 14 días (admin 12 h)           |
-| `nx_csrf`      | `__Host-nx_csrf`    | Valor aleatorio del CSRF            | `/`                | Vida máxima de la sesión: 30 días (admin 7) |
-| `nx_mfa`       | `__Secure-nx_mfa`   | Paso intermedio del login del admin | `/api/v1/auth/mfa` | 5 min                                       |
+| Cookie (local)     | Cookie (producción)         | Contenido                                   | Path                  | Max-Age                                     |
+| ------------------ | --------------------------- | ------------------------------------------- | --------------------- | ------------------------------------------- |
+| `nx_at`            | `__Host-nx_at`              | Access JWT                                  | `/`                   | 10 min (admin 5)                            |
+| `nx_rt`            | `__Secure-nx_rt`            | Refresh opaco                               | `/api/v1/auth`        | Inactividad: 14 días (admin 12 h)           |
+| `nx_csrf`          | `__Host-nx_csrf`            | Valor aleatorio del CSRF                    | `/`                   | Vida máxima de la sesión: 30 días (admin 7) |
+| `nx_mfa`           | `__Secure-nx_mfa`           | Paso intermedio del login del admin         | `/api/v1/auth/mfa`    | 5 min                                       |
+| `nx_oauth`         | `__Secure-nx_oauth`         | state, nonce y PKCE de Google (cifrado)     | `/api/v1/auth/google` | 10 min                                      |
+| `nx_oauth_pending` | `__Secure-nx_oauth_pending` | Vinculación o registro con Google pendiente | `/api/v1/auth/google` | 30 min                                      |
 
 Todas: `HttpOnly`, `SameSite=Lax`, **sin `Domain`** (solo las recibe `api.<dominio>`), `Secure` en
 producción (`COOKIE_SECURE=true`, obligatorio). Se borran con exactamente los mismos atributos. Los
@@ -117,12 +119,13 @@ cuenta y cuando el admin cierra todos los dispositivos de una cuenta comprometid
 
 ### Email y contraseña
 
-| Flujo                               | Endpoints                                                                                                          | Notas                                                                                                                          |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| Verificar email                     | `POST /auth/email/verify {token}` · `POST /auth/email/resend`                                                      | Token de un solo uso, 24 h                                                                                                     |
-| Recuperar contraseña (ADR 0002)     | `POST /admin/users/:id/password-reset {reason}` (admin) → email → `POST /auth/password/reset {token, newPassword}` | El admin nunca ve la contraseña ni el token. Enlace de 30 min, un solo uso. Cierra **todas** las sesiones. Auditado con motivo |
-| Olvidé mi contraseña (autoservicio) | `POST /auth/password/forgot`                                                                                       | Implementado pero **apagado** (`PASSWORD_SELF_RESET_ENABLED=false` → 404)                                                      |
-| Cambiar contraseña                  | `POST /auth/password/change {currentPassword, newPassword}`                                                        | Exige la actual                                                                                                                |
+| Flujo                                 | Endpoints                                                                                                          | Notas                                                                                                                          |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Verificar email                       | `POST /auth/email/verify {token}` · `POST /auth/email/resend`                                                      | Token de un solo uso, 24 h                                                                                                     |
+| Recuperar contraseña (ADR 0002)       | `POST /admin/users/:id/password-reset {reason}` (admin) → email → `POST /auth/password/reset {token, newPassword}` | El admin nunca ve la contraseña ni el token. Enlace de 30 min, un solo uso. Cierra **todas** las sesiones. Auditado con motivo |
+| Olvidé mi contraseña (autoservicio)   | `POST /auth/password/forgot`                                                                                       | Implementado pero **apagado** (`PASSWORD_SELF_RESET_ENABLED=false` → 404)                                                      |
+| Cambiar contraseña                    | `POST /auth/password/change {currentPassword, newPassword}`                                                        | Exige la actual                                                                                                                |
+| Crear contraseña (cuenta solo Google) | `POST /auth/password/set {newPassword}`                                                                            | Solo si no tiene contraseña y con un inicio de sesión de menos de 10 minutos (ADR 0023)                                        |
 
 Contraseñas (ADR 0011): 8 a 128 caracteres (admin: mínimo 12), distinta del email, sin reglas de
 composición. Hash argon2id.
@@ -130,6 +133,35 @@ composición. Hash argon2id.
 Enlaces de los emails (se arman con `FRONTEND_URL`, nunca con el header `Host`):
 `<FRONTEND_URL>/verificar-email?token=…` y `<FRONTEND_URL>/restablecer-contrasena?token=…`.
 El frontend toma el `token` de la URL y lo manda al endpoint correspondiente.
+
+### Login con Google (ADR 0015 y 0023)
+
+Authorization code con PKCE, `state` y `nonce` (OpenID Connect, `openid-client`). Solo se aceptan
+emails verificados por Google. El admin nunca usa Google. Con `GOOGLE_PROVIDER=disabled` todas estas
+rutas responden 404; hasta tener las credenciales de Google Cloud, desarrollo y tests usan `fake`.
+
+1. El botón "Entrar con Google" **navega** (no `fetch`) a `GET /api/v1/auth/google`: la API guarda el
+   state en `nx_oauth` y redirige a Google.
+2. Google vuelve a `GET /api/v1/auth/google/callback` y la API redirige al frontend a
+   `<FRONTEND_URL>/ingresar/google?resultado=…`:
+
+   | `resultado` | Qué pasó                                                                                                                                           | Qué hace el frontend                                                                                                            |
+   | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+   | `session`   | Cuenta de Google ya vinculada: sesión iniciada                                                                                                     | `GET /auth/csrf` y entra                                                                                                        |
+   | `link`      | El email ya tiene cuenta: **no se vincula sola**                                                                                                   | `GET /auth/google/pending` y ofrece: contraseña (`POST /auth/google/link`) o enlace por email (`POST /auth/google/link/email`)  |
+   | `signup`    | Email nuevo                                                                                                                                        | `GET /auth/google/pending` (precarga nombre) y el formulario del registro sin email ni contraseña: `POST /auth/google/register` |
+   | `error`     | `codigo`: `CANCELLED`, `INVALID_STATE`, `EMAIL_NOT_VERIFIED`, `GOOGLE_NOT_ALLOWED`, `ACCOUNT_UNAVAILABLE`, `OTHER_GOOGLE_ACCOUNT`, `GOOGLE_FAILED` | Muestra el motivo                                                                                                               |
+
+3. El enlace por email llega a `<FRONTEND_URL>/vincular-google?token=…` y se confirma con
+   `POST /auth/google/link/confirm {token}` (sirve en cualquier navegador, una sola vez, 30 minutos).
+4. Las respuestas de `link`, `link/confirm` y `register` son iguales a las del login (cookies +
+   `csrfToken`). Una cuenta nueva con Google tiene el email verificado, queda en
+   `PENDING_VERIFICATION` y pasa por la misma verificación de identidad.
+
+Cuentas sin contraseña (ADR 0023): `/auth/me` informa `hasPassword` y `googleLinked`. Crear la
+contraseña y darse de baja exigen un inicio de sesión de menos de 10 minutos (si no: 403
+`REAUTH_REQUIRED`, volver a entrar con Google). `DELETE /auth/google/link` desvincula solo si la
+cuenta tiene contraseña.
 
 ## CSRF (defensa en capas)
 
@@ -230,6 +262,6 @@ Cambiá la contraseña después del primer login.
 
 ## Qué falta (ver `docs/decisions/pendientes.md`)
 
-CAPTCHA tras varios fallos, chequeo de contraseñas filtradas, cambio de email, Google OAuth (etapa 7B, ADR 0015),
+CAPTCHA tras varios fallos, chequeo de contraseñas filtradas, cambio de email, credenciales reales de Google (ADR 0023),
 rotación/reenrolamiento del TOTP del admin, job de limpieza de sesiones vencidas y proveedor real de
 email (sin él la API no arranca en producción).

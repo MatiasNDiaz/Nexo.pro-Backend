@@ -77,6 +77,15 @@ Secretos: generalos con `node -e "console.log(require('crypto').randomBytes(64).
 En `.env.test` estas variables tienen valores fijos de prueba (públicos en el repo: no sirven para
 otro ambiente) y `TRUST_PROXY=1`, para que cada cliente de los e2e simule su propia IP.
 
+## Login con Google (etapa 7B)
+
+| Variable               | Obligatoria           | Defecto    | Descripción                                                                                          |
+| ---------------------- | --------------------- | ---------- | ---------------------------------------------------------------------------------------------------- |
+| `GOOGLE_PROVIDER`      | No                    | `disabled` | `disabled` (sin Google), `google` o `fake` (simulado: desarrollo y tests, prohibido en producción)   |
+| `GOOGLE_CLIENT_ID`     | Con `google`          | —          | ID del cliente OAuth de Google Cloud                                                                 |
+| `GOOGLE_CLIENT_SECRET` | Con `google`          | —          | **Secreto** del cliente OAuth                                                                        |
+| `GOOGLE_CALLBACK_URL`  | Con `google` o `fake` | —          | URL pública de `/api/v1/auth/google/callback`, igual a la registrada en Google (https en producción) |
+
 ## Docker Compose (`.env`)
 
 | Variable                | Defecto         | Descripción                                                       |
@@ -97,5 +106,4 @@ El script `docker/postgres/init/` solo corre con el volumen vacío. Si cambiás 
 
 ## Próximas etapas
 
-Se agregan con su etapa y se documentan acá: proveedor real de email, login con Google (7B),
-pagos (9). Lista propuesta: plan §15.2.
+Se agregan con su etapa y se documentan acá: proveedor real de email, pagos (9). Lista propuesta: plan §15.2.
