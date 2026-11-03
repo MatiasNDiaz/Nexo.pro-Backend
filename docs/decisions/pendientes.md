@@ -1,6 +1,7 @@
 # Decisiones pendientes y contradicciones abiertas (lista viva)
 
-Fuente: plan §4.2 y §4.3 más el análisis de la etapa 1. Se actualiza al cerrar cada etapa.
+Fuente: plan §4.2 y §4.3 más el análisis de la etapa 1. Se actualiza al cerrar cada etapa. El orden
+para salir a producción, con quién hace cada cosa, está en [`../checklist-produccion.md`](../checklist-produccion.md).
 "Bloquea" indica la primera etapa que no puede cerrarse sin la decisión.
 
 ## Contradicciones
