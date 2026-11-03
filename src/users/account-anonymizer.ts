@@ -50,6 +50,7 @@ export async function anonymizeAccount(manager: EntityManager, userId: string): 
     .where('user_id = :userId AND deactivated_at IS NULL', { userId })
     .execute();
   await anonymizeProfiles(manager, userId);
+  await removeCommunityContent(manager, userId);
   await manager
     .createQueryBuilder()
     .update(AuthSession)
@@ -73,6 +74,37 @@ export async function accountsDueForAnonymization(
     })
     .getRawMany<{ id: string }>();
   return rows.map((row) => row.id);
+}
+
+/**
+ * Comunidad (ADR 0028): sus publicaciones y respuestas del foro se borran (texto, datos, fotos y
+ * "me gusta"); sus favoritos y su opinión sobre la plataforma, también. Las reseñas que escribió
+ * se conservan: el autor pasa a mostrarse como "Usuario eliminado".
+ */
+async function removeCommunityContent(manager: EntityManager, userId: string): Promise<void> {
+  const posts = `SELECT id FROM forum_posts WHERE author_id = $1`;
+  await manager.query(`DELETE FROM forum_post_media WHERE post_id IN (${posts})`, [userId]);
+  await manager.query(`DELETE FROM forum_post_professions WHERE post_id IN (${posts})`, [userId]);
+  await manager.query(
+    `UPDATE forum_posts
+        SET body = '', locality_id = NULL, neighborhood_id = NULL, budget_estimate = NULL,
+            deadline = NULL, deleted_at = COALESCE(deleted_at, now()), updated_at = now()
+      WHERE author_id = $1`,
+    [userId],
+  );
+  await manager.query(
+    `UPDATE forum_replies
+        SET body = '', proposed_price = NULL, deleted_at = COALESCE(deleted_at, now()),
+            updated_at = now()
+      WHERE author_id = $1`,
+    [userId],
+  );
+  await manager.query(`DELETE FROM forum_post_likes WHERE user_id = $1`, [userId]);
+  await manager.query(`DELETE FROM forum_reply_likes WHERE user_id = $1`, [userId]);
+  await manager.query(`DELETE FROM favorites WHERE customer_id = $1 OR professional_id = $1`, [
+    userId,
+  ]);
+  await manager.query(`DELETE FROM platform_reviews WHERE user_id = $1`, [userId]);
 }
 
 /**

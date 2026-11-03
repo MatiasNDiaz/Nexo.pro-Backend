@@ -90,6 +90,10 @@ export class CatalogItemDto {
   coverImageUrl: string | null;
   @ApiProperty({ nullable: true, type: String, description: 'Video de presentación en catálogo' })
   catalogVideoUrl: string | null;
+  @ApiProperty({ nullable: true, type: Number, description: 'Promedio de estrellas (un decimal)' })
+  ratingAverage: number | null;
+  @ApiProperty({ description: 'Cantidad de reseñas visibles' })
+  ratingCount: number;
 }
 
 export class CatalogPageDto {

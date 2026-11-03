@@ -19,6 +19,13 @@ export enum NotificationType {
   SUBSCRIPTION_UPDATED = 'SUBSCRIPTION_UPDATED',
   /** Al admin: pago que no coincide, que no se pudo aplicar, reembolsado o desconocido. */
   PAYMENT_ALERT = 'PAYMENT_ALERT',
+  /** ADR 0028: reseña recibida (profesional) y respuesta a la reseña (cliente). */
+  REVIEW_RECEIVED = 'REVIEW_RECEIVED',
+  REVIEW_REPLIED = 'REVIEW_REPLIED',
+  /** Respuesta a una publicación o a una respuesta propia del foro. */
+  FORUM_REPLY = 'FORUM_REPLY',
+  /** Un favorito se puso "Disponible" (planes con avisos). */
+  PROFESSIONAL_AVAILABLE = 'PROFESSIONAL_AVAILABLE',
 }
 
 export enum NotificationTarget {
@@ -27,6 +34,10 @@ export enum NotificationTarget {
   CONTRACT = 'CONTRACT',
   SUBSCRIPTION = 'SUBSCRIPTION',
   PAYMENT = 'PAYMENT',
+  REVIEW = 'REVIEW',
+  FORUM_POST = 'FORUM_POST',
+  /** El id es el del usuario profesional. */
+  PROFESSIONAL = 'PROFESSIONAL',
 }
 
 /** Notificaciones dentro de la app (P-15). Los canales externos llegan en la etapa 13. */

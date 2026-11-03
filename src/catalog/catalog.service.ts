@@ -27,6 +27,7 @@ import {
 import { type ProfileTheme, themeFieldsNotAllowed } from '../professionals/profile-theme';
 import { SubscriptionPlan, ThemeLevel } from '../subscriptions/entities/subscription-plan.entity';
 import { FileKind } from '../uploads/file.enums';
+import { ratingColumns } from '../reviews/review-rules';
 import { UploadsService } from '../uploads/uploads.service';
 import { User } from '../users/entities/user.entity';
 import type {
@@ -111,6 +112,8 @@ interface CatalogRow {
   avatar_file_id: string;
   effective_status: AttentionStatus;
   plan_id: string;
+  rating_average: string | null;
+  rating_count: string;
   total: string;
 }
 
@@ -165,7 +168,8 @@ export class CatalogService {
     const rows: CatalogRow[] = await this.dataSource.query(
       `SELECT p.id, p.user_id, p.slug, u.first_name, u.last_name, p.business_name, p.bio,
               p.years_experience, p.reference_rate, p.rate_mode, p.free_quote, u.avatar_file_id,
-              st.effective_status, sp.id AS plan_id, count(*) OVER () AS total
+              st.effective_status, sp.id AS plan_id, ${ratingColumns('u.id')},
+              count(*) OVER () AS total
          FROM professional_profiles p
          JOIN users u ON u.id = p.user_id
          ${LIVE_SUBSCRIPTION}
@@ -202,7 +206,7 @@ export class CatalogService {
     const rows: CatalogRow[] = await this.dataSource.query(
       `SELECT p.id, p.user_id, p.slug, u.first_name, u.last_name, p.business_name, p.bio,
               p.years_experience, p.reference_rate, p.rate_mode, p.free_quote, u.avatar_file_id,
-              st.effective_status, sp.id AS plan_id, 1 AS total
+              st.effective_status, sp.id AS plan_id, ${ratingColumns('u.id')}, 1 AS total
          FROM professional_profiles p
          JOIN users u ON u.id = p.user_id
          ${LIVE_SUBSCRIPTION}
@@ -383,6 +387,8 @@ export class CatalogService {
           ),
         coverImageUrl: firstOf(MediaPurpose.PRESENTATION),
         catalogVideoUrl: plan && plan.maxVideos > 0 ? firstOf(MediaPurpose.CATALOG_VIDEO) : null,
+        ratingAverage: row.rating_average === null ? null : Number(row.rating_average),
+        ratingCount: Number(row.rating_count),
       };
     });
   }

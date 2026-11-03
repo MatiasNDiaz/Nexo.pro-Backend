@@ -11,6 +11,9 @@ import { CatalogModule } from './catalog/catalog.module';
 import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PaymentsModule } from './payments/payments.module';
+import { FavoritesModule } from './favorites/favorites.module';
+import { ForumModule } from './forum/forum.module';
+import { ReviewsModule } from './reviews/reviews.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { RequestsModule } from './requests/requests.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -103,6 +106,9 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
     ChatModule,
     RequestsModule,
     PaymentsModule,
+    ReviewsModule,
+    FavoritesModule,
+    ForumModule,
   ],
   providers: [
     // Guards globales, en este orden (plan §9.8). Denegación por defecto: solo `@Public()` pasa

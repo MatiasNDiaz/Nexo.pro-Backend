@@ -6,6 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityManager, In, IsNull, MoreThanOrEqual, Not } from 'typeorm';
 import { AUDIT_LOGGER, type AuditLogger } from '../audit/audit-logger';
 import type { ApiErrorDetail } from '../common/errors/api-error';
@@ -40,10 +41,25 @@ import { ProfessionalProfile } from './entities/professional-profile.entity';
 import { ProfessionalServiceArea } from './entities/professional-service-area.entity';
 import { ProfessionalSocialLink } from './entities/professional-social-link.entity';
 import { fitToLimit } from './plan-limits';
-import { CertStatus, MediaPurpose, MediaStatus, ProItemStatus } from './professional.enums';
+import {
+  AttentionStatus,
+  CertStatus,
+  MediaPurpose,
+  MediaStatus,
+  ProItemStatus,
+} from './professional.enums';
 import { ProfessionalsService } from './professionals.service';
 import { type ProfileTheme, themeFieldsNotAllowed } from './profile-theme';
 import { normalizeSocialUrl } from './social-links';
+
+export const ProfessionalEvents = {
+  /** El profesional se puso "Disponible" a mano (después del cambio). */
+  MARKED_AVAILABLE: 'professionals.marked-available',
+} as const;
+
+export interface MarkedAvailableEvent {
+  userId: string;
+}
 
 /** Máximo de certificados por profesional, en todos los planes (ADR 0020). */
 export const MAX_CERTIFICATIONS = 10;
@@ -73,6 +89,7 @@ export class ProfileService {
     private readonly subscriptions: SubscriptionsService,
     private readonly uploads: UploadsService,
     @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
+    private readonly events: EventEmitter2,
   ) {}
 
   async me(userId: string, now = new Date()): Promise<ProfessionalMeDto> {
@@ -252,11 +269,21 @@ export class ProfileService {
         message: 'El vencimiento tiene que ser en el futuro y dentro de los próximos 7 días.',
       });
     }
+    const before = (await this.me(userId, now)).attention.effective;
     const profile = await this.ownProfile(this.dataSource.manager, userId);
     await this.dataSource
       .getRepository(ProfessionalProfile)
       .update(profile.id, { attentionStatus: dto.status, attentionStatusUntil: until });
-    return this.me(userId);
+    const after = await this.me(userId, now);
+    // Aviso a quienes lo tienen en favoritos (ADR 0028): solo al ponerse "Disponible" a mano.
+    if (
+      before !== AttentionStatus.AVAILABLE &&
+      after.attention.effective === AttentionStatus.AVAILABLE
+    ) {
+      const event: MarkedAvailableEvent = { userId };
+      await this.events.emitAsync(ProfessionalEvents.MARKED_AVAILABLE, event);
+    }
+    return after;
   }
 
   /** Profesiones: entre 1 y las que permita el plan, con una principal (FI §6.3 y §7.1). */
