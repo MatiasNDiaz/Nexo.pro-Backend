@@ -28,6 +28,7 @@ import { AccountStatus, UserRole, VerificationStatus } from '../user.enums';
 // Parcial (solo cuentas en gracia): creado en la migración.
 @Index('ix_users_deletion_scheduled_for', { synchronize: false })
 @Check('ck_users_failed_login_attempts', 'failed_login_attempts >= 0')
+@Check('ck_users_pending_name', '(pending_first_name IS NULL) = (pending_last_name IS NULL)')
 // Las cuentas borradas se anonimizan (ADR 0013) y pierden el barrio.
 @Check(
   'ck_users_customer_neighborhood',
@@ -79,6 +80,13 @@ export class User {
 
   @Column({ type: 'varchar', length: 60 })
   lastName: string;
+
+  /** Nombre nuevo en revisión del admin, con la identidad ya aprobada (ADR 0021). No es público. */
+  @Column({ type: 'varchar', length: 60, nullable: true })
+  pendingFirstName: string | null;
+
+  @Column({ type: 'varchar', length: 60, nullable: true })
+  pendingLastName: string | null;
 
   @Column({ type: 'varchar', length: 20 })
   phone: string;

@@ -13,6 +13,7 @@ import { CreateStoredFiles1793640011000 } from './1793640011000-CreateStoredFile
 import { CreateIdentityVerification1793640012000 } from './1793640012000-CreateIdentityVerification';
 import { ProfilesMediaAvailability1793640013000 } from './1793640013000-ProfilesMediaAvailability';
 import { CreateSubscriptions1793640014000 } from './1793640014000-CreateSubscriptions';
+import { PendingNameChange1793640015000 } from './1793640015000-PendingNameChange';
 
 /**
  * Lista explícita (en orden) de migraciones. Se registran a mano en vez de con un glob para que
@@ -35,4 +36,5 @@ export const MIGRATIONS = [
   CreateIdentityVerification1793640012000,
   ProfilesMediaAvailability1793640013000,
   CreateSubscriptions1793640014000,
+  PendingNameChange1793640015000,
 ];

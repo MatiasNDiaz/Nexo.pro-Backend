@@ -14,10 +14,10 @@ import {
 import { User } from '../../users/entities/user.entity';
 import { VerificationStatus } from '../../users/user.enums';
 
-/** IDENTITY: verificación de la persona. AVATAR_CHANGE: revisión de una foto nueva (ADR 0019). */
+/** IDENTITY: verificación de la persona. PROFILE_CHANGE: revisión de foto o nombre nuevos (ADR 0019 y 0021). */
 export enum VerificationKind {
   IDENTITY = 'IDENTITY',
-  AVATAR_CHANGE = 'AVATAR_CHANGE',
+  PROFILE_CHANGE = 'PROFILE_CHANGE',
 }
 
 export enum DecisionSource {
