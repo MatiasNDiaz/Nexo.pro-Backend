@@ -1,10 +1,11 @@
 /**
- * Fechas del panel de ingresos (ADR 0030). Los rangos son días de calendario en hora de Córdoba,
+ * Períodos de calendario del panel de ingresos (ADR 0030) y de las métricas Premium (ADR 0033).
+ * Los rangos son días de calendario en hora de Córdoba,
  * como texto `YYYY-MM-DD` con ambos extremos incluidos; la base los convierte a instantes con
  * `AT TIME ZONE`. Acá solo hay aritmética de calendario (en UTC, para no depender del huso del
  * servidor).
  */
-export const REVENUE_TIME_ZONE = 'America/Argentina/Cordoba';
+export const CORDOBA_TIME_ZONE = 'America/Argentina/Cordoba';
 
 export type GroupBy = 'day' | 'week' | 'month' | 'year';
 
@@ -36,7 +37,7 @@ function addMonths(day: string, months: number, toMonthEnd = false): string {
 
 /** Hoy en Córdoba. */
 export function today(now = new Date()): string {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: REVENUE_TIME_ZONE }).format(now);
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: CORDOBA_TIME_ZONE }).format(now);
 }
 
 export const daysIn = (range: DateRange) =>

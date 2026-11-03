@@ -5,9 +5,9 @@ import {
   daysIn,
   previousRange,
   today,
-} from './revenue-periods';
+} from './calendar-periods';
 
-describe('Períodos del panel de ingresos', () => {
+describe('Períodos de calendario (panel de ingresos y métricas)', () => {
   it('el mes hasta hoy se compara con los mismos días del mes anterior', () => {
     expect(previousRange({ from: '2026-11-01', to: '2026-11-03' })).toEqual({
       from: '2026-10-01',

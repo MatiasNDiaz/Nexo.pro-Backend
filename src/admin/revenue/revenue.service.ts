@@ -33,9 +33,9 @@ import {
   daysIn,
   type GroupBy,
   previousRange,
-  REVENUE_TIME_ZONE,
+  CORDOBA_TIME_ZONE,
   today,
-} from './revenue-periods';
+} from '../../common/calendar-periods';
 
 /** Un CSV más grande pide acotar las fechas. */
 export const MAX_EXPORT_ROWS = 50_000;
@@ -79,7 +79,7 @@ class Where {
 
   /** Días de Córdoba, ambos incluidos. */
   range(column: string, range: Partial<DateRange>): this {
-    const zone = `'${REVENUE_TIME_ZONE}'`;
+    const zone = `'${CORDOBA_TIME_ZONE}'`;
     if (range.from) {
       this.add(`${column} >= (${this.param(range.from)}::date)::timestamp AT TIME ZONE ${zone}`);
     }
@@ -171,7 +171,7 @@ const STATUS_LABELS: Record<PaymentStatus, string> = {
 const ROLE_LABELS: Record<string, string> = { CUSTOMER: 'Cliente', PROFESSIONAL: 'Profesional' };
 
 const dateTime = new Intl.DateTimeFormat('sv-SE', {
-  timeZone: REVENUE_TIME_ZONE,
+  timeZone: CORDOBA_TIME_ZONE,
   dateStyle: 'short',
   timeStyle: 'short',
 });
@@ -499,7 +499,7 @@ export class RevenueService {
          SELECT p.plan_id, p.amount, p.money_returned_at, p.status::text
            FROM payments p JOIN users u ON u.id = p.user_id
            ${filtersFor('p.money_returned_at')})
-       SELECT to_char(date_trunc(${unit}, m.at AT TIME ZONE '${REVENUE_TIME_ZONE}'), 'YYYY-MM-DD')
+       SELECT to_char(date_trunc(${unit}, m.at AT TIME ZONE '${CORDOBA_TIME_ZONE}'), 'YYYY-MM-DD')
                 AS bucket,
               sp.code AS plan_code, m.move, sum(m.amount)::text AS amount, count(*) AS count
          FROM moves m JOIN subscription_plans sp ON sp.id = m.plan_id

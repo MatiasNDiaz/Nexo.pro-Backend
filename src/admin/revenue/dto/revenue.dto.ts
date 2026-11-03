@@ -14,7 +14,7 @@ import {
 } from 'class-validator';
 import { PaymentKind, PaymentStatus } from '../../../payments/entities/payment.entity';
 import { UserRole } from '../../../users/user.enums';
-import type { GroupBy } from '../revenue-periods';
+import type { GroupBy } from '../../../common/calendar-periods';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const GROUP_BY: GroupBy[] = ['day', 'week', 'month', 'year'];
