@@ -9,7 +9,9 @@ interface Rule {
   actors: readonly ContractActor[];
 }
 
-const OPEN: readonly S[] = [S.ACCEPTED, S.SCHEDULED, S.IN_PROGRESS];
+/** Contratación en curso: todavía no terminó ni se canceló. */
+export const OPEN_CONTRACT_STATUSES: readonly S[] = [S.ACCEPTED, S.SCHEDULED, S.IN_PROGRESS];
+const OPEN = OPEN_CONTRACT_STATUSES;
 
 /**
  * Transiciones de la contratación (ADR 0025, FI §11.3 y §11.4). Solo el profesional avanza; los dos

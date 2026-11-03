@@ -16,6 +16,8 @@ import {
 } from '../notifications/entities/notification.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ProfessionalProfile } from '../professionals/entities/professional-profile.entity';
+import { OPEN_CONTRACT_STATUSES } from '../requests/contract-state-machine';
+import { ServiceContract } from '../requests/entities/requests.entities';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { StoredFile } from '../uploads/entities/stored-file.entity';
@@ -105,12 +107,17 @@ export class ChatService {
 
   async list(user: AuthUser): Promise<ConversationDto[]> {
     await this.assertCanUseChat(user);
-    const conversations = await this.dataSource.getRepository(Conversation).find({
+    let conversations = await this.dataSource.getRepository(Conversation).find({
       where:
         user.role === UserRole.CUSTOMER ? { customerId: user.id } : { professionalId: user.id },
       order: { lastMessageAt: { direction: 'DESC', nulls: 'LAST' }, createdAt: 'DESC' },
       take: 100,
     });
+    // Sin plan vigente, el profesional ve solo los chats con una contratación en curso (C-12).
+    if (user.role === UserRole.PROFESSIONAL && !(await this.subscriptions.livePlan(user.id))) {
+      const open = await this.openContractCustomers(user.id);
+      conversations = conversations.filter((c) => open.has(c.customerId));
+    }
     return Promise.all(conversations.map((c) => this.toConversation(user, c)));
   }
 
@@ -144,7 +151,9 @@ export class ChatService {
       });
     }
     const { conversation, role } = await this.participation(user, conversationId);
-    if (role === 'CUSTOMER') await this.assertProfessionalCanReply(conversation.professionalId);
+    if (role === 'CUSTOMER') {
+      await this.assertProfessionalCanReply(conversation.professionalId, conversation.customerId);
+    }
 
     const created: Notification[] = [];
     const message = await this.dataSource.transaction(async (manager) => {
@@ -319,25 +328,47 @@ export class ChatService {
     if (!conversation) throw notFound();
     if (conversation.customerId === user.id) return { conversation, role: 'CUSTOMER' };
     if (conversation.professionalId !== user.id) throw notFound();
-    await this.assertCanUseChat(user);
+    await this.assertCanUseChat(user, conversation.customerId);
     return { conversation, role: 'PROFESSIONAL' };
   }
 
-  /** FI §12: un profesional sin prueba ni plan vigente no usa el chat. */
-  private async assertCanUseChat(user: AuthUser): Promise<void> {
+  /**
+   * FI §12: un profesional sin prueba ni plan vigente no usa el chat, salvo con un cliente con el
+   * que tiene una contratación en curso, hasta que se cierre (C-12, ADR 0027). Sin cliente (la
+   * lista), alcanza con tener alguna en curso.
+   */
+  private async assertCanUseChat(user: AuthUser, customerId?: string): Promise<void> {
     if (user.role !== UserRole.PROFESSIONAL) return;
-    if (!(await this.subscriptions.livePlan(user.id))) throw subscriptionRequired();
+    if (!(await this.professionalCanChat(user.id, customerId))) throw subscriptionRequired();
   }
 
-  /** El cliente solo escribe si el profesional puede responder (activo y con plan, C-12). */
-  private async assertProfessionalCanReply(professionalId: string): Promise<void> {
+  private async professionalCanChat(professionalId: string, customerId?: string) {
+    if (await this.subscriptions.livePlan(professionalId)) return true;
+    const open = await this.openContractCustomers(professionalId);
+    return customerId === undefined ? open.size > 0 : open.has(customerId);
+  }
+
+  /** Clientes con los que el profesional tiene una contratación en curso. */
+  private async openContractCustomers(professionalId: string): Promise<Set<string>> {
+    const contracts = await this.dataSource.getRepository(ServiceContract).find({
+      where: { professionalId, status: In([...OPEN_CONTRACT_STATUSES]) },
+      select: { customerId: true },
+    });
+    return new Set(contracts.map((c) => c.customerId));
+  }
+
+  /** El cliente solo escribe si el profesional puede responder (activo y con plan, o C-12). */
+  private async assertProfessionalCanReply(
+    professionalId: string,
+    customerId: string,
+  ): Promise<void> {
     const professional = await this.dataSource
       .getRepository(User)
       .findOneBy({ id: professionalId });
     const available =
       professional?.status === AccountStatus.ACTIVE &&
       professional.role === UserRole.PROFESSIONAL &&
-      (await this.subscriptions.livePlan(professionalId)) !== null;
+      (await this.professionalCanChat(professionalId, customerId));
     if (!available) {
       throw new ConflictException({
         code: 'PROFESSIONAL_UNAVAILABLE',
@@ -446,7 +477,7 @@ export class ChatService {
     }
     const canWrite =
       myRole === 'PROFESSIONAL' ||
-      (await this.assertProfessionalCanReply(c.professionalId).then(
+      (await this.assertProfessionalCanReply(c.professionalId, c.customerId).then(
         () => true,
         () => false,
       ));

@@ -1,9 +1,10 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DataSource } from 'typeorm';
 import { Quote, ServiceContractHistory } from '../src/requests/entities/requests.entities';
+import { Subscription } from '../src/subscriptions/entities/subscription.entity';
 import { type Client, signInCustomer } from './utils/auth-client';
 import { createTestApp } from './utils/create-test-app';
-import { listedProfessional } from './utils/marketplace';
+import { listedProfessional, openChat } from './utils/marketplace';
 
 interface RequestBody {
   id: string;
@@ -248,5 +249,45 @@ describe('Solicitudes y contrataciones (e2e)', () => {
     const { request } = await scenario(1);
     expect((await customer.client.get(`/requests/${request.id}`)).status).toBe(404);
     expect((await pro.client.get(`/requests/${request.id}`)).status).toBe(404);
+  });
+
+  it('C-12: sin plan vigente, el chat sigue solo mientras haya una contratación en curso', async () => {
+    const { pros, customer, targetOf } = await scenario(1);
+    const [pro] = pros;
+    const conversationId = targetOf(pro.id).conversationId;
+    await pro.client.post(`/requests/targets/${targetOf(pro.id).id}/quotes`, { amount: 9000 });
+    const contract = (
+      await customer.client.post(`/requests/targets/${targetOf(pro.id).id}/select`, {})
+    ).body as { id: string };
+    // Otro cliente le escribió antes, sin contratación.
+    const other = await signInCustomer(app);
+    const otherChat = await openChat(other.client, pro.id);
+    await dataSource
+      .getRepository(Subscription)
+      .update({ userId: pro.id }, { trialEndsAt: new Date(Date.now() - 1000) });
+    const write = (client: Client, id: string, body: string) =>
+      client.post(`/chat/conversations/${id}/messages`, { body });
+
+    expect((await write(customer.client, conversationId, 'Mañana a las 10?')).status).toBe(201);
+    expect((await write(pro.client, conversationId, 'Dale, ahí estoy')).status).toBe(201);
+    const list = (await pro.client.get('/chat/conversations')).body as Array<{ id: string }>;
+    expect(list.map((c) => c.id)).toEqual([conversationId]);
+    expect((await write(other.client, otherChat, 'hola?')).body.code).toBe(
+      'PROFESSIONAL_UNAVAILABLE',
+    );
+    expect((await pro.client.get(`/chat/conversations/${otherChat}/messages`)).status).toBe(403);
+    expect(
+      ((await pro.client.get('/contracts')).body as Array<{ id: string }>).map((c) => c.id),
+    ).toEqual([contract.id]);
+
+    // La lleva hasta el cierre; después, el cliente lee pero no escribe.
+    expect((await pro.client.post(`/contracts/${contract.id}/complete`)).status).toBe(200);
+    expect((await write(customer.client, conversationId, 'Gracias!')).body.code).toBe(
+      'PROFESSIONAL_UNAVAILABLE',
+    );
+    expect(
+      (await customer.client.get(`/chat/conversations/${conversationId}/messages`)).status,
+    ).toBe(200);
+    expect((await pro.client.get('/chat/conversations')).body.code).toBe('SUBSCRIPTION_REQUIRED');
   });
 });

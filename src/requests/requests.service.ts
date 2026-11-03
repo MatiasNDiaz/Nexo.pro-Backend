@@ -20,7 +20,11 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { subscriptionRequired } from '../uploads/uploads.service';
 import { User } from '../users/entities/user.entity';
 import { AccountStatus, UserRole } from '../users/user.enums';
-import { type ContractAction, nextContractStatus } from './contract-state-machine';
+import {
+  type ContractAction,
+  nextContractStatus,
+  OPEN_CONTRACT_STATUSES,
+} from './contract-state-machine';
 import type {
   ContractDto,
   CreateRequestDto,
@@ -396,14 +400,17 @@ export class RequestsService {
     return this.getContract(customer, contractId);
   }
 
-  /** Avance o cancelación de la contratación (tabla de transiciones, ADR 0025). */
+  /**
+   * Avance o cancelación de la contratación (tabla de transiciones, ADR 0025). No exige plan: solo
+   * se mueven contrataciones en curso, y el profesional sin plan puede llevarlas hasta el cierre
+   * (C-12, ADR 0027).
+   */
   async transition(
     user: AuthUser,
     contractId: string,
     action: ContractAction,
     data: { scheduledAt?: Date; reason?: string } = {},
   ): Promise<ContractDto> {
-    if (user.role === UserRole.PROFESSIONAL) await this.requirePlan(user);
     if (action === 'SCHEDULE' && (!data.scheduledAt || data.scheduledAt <= new Date())) {
       throw new BadRequestException({
         code: 'INVALID_DATE',
@@ -518,11 +525,18 @@ export class RequestsService {
     return this.toRequest(request, user.id);
   }
 
+  /** Sin plan vigente, el profesional ve solo las contrataciones en curso (C-12, ADR 0027). */
   async listContracts(user: AuthUser): Promise<ContractDto[]> {
-    if (user.role === UserRole.PROFESSIONAL) await this.requirePlan(user);
+    const onlyOpen =
+      user.role === UserRole.PROFESSIONAL && !(await this.subscriptions.livePlan(user.id));
     const contracts = await this.dataSource.getRepository(ServiceContract).find({
       where:
-        user.role === UserRole.CUSTOMER ? { customerId: user.id } : { professionalId: user.id },
+        user.role === UserRole.CUSTOMER
+          ? { customerId: user.id }
+          : {
+              professionalId: user.id,
+              ...(onlyOpen && { status: In([...OPEN_CONTRACT_STATUSES]) }),
+            },
       order: { createdAt: 'DESC' },
       take: 100,
     });
