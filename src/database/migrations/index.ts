@@ -15,6 +15,7 @@ import { ProfilesMediaAvailability1793640013000 } from './1793640013000-Profiles
 import { CreateSubscriptions1793640014000 } from './1793640014000-CreateSubscriptions';
 import { PendingNameChange1793640015000 } from './1793640015000-PendingNameChange';
 import { GoogleLogin1793640016000 } from './1793640016000-GoogleLogin';
+import { ChatRequestsContracts1793640017000 } from './1793640017000-ChatRequestsContracts';
 
 /**
  * Lista explícita (en orden) de migraciones. Se registran a mano en vez de con un glob para que
@@ -39,4 +40,5 @@ export const MIGRATIONS = [
   CreateSubscriptions1793640014000,
   PendingNameChange1793640015000,
   GoogleLogin1793640016000,
+  ChatRequestsContracts1793640017000,
 ];

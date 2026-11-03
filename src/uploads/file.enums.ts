@@ -5,6 +5,8 @@ export enum FilePurpose {
   PROFILE_MEDIA = 'PROFILE_MEDIA',
   /** Certificados (ADR 0020): imagen o PDF. */
   CERTIFICATE = 'CERTIFICATE',
+  /** Adjuntos del chat (ADR 0024): privados, solo para los dos participantes. */
+  CHAT_ATTACHMENT = 'CHAT_ATTACHMENT',
 }
 
 export enum FileKind {
@@ -14,7 +16,7 @@ export enum FileKind {
   DOCUMENT = 'DOCUMENT',
 }
 
-/** PUBLIC: se sirve sin sesión (foto, medios y certificados, ADR 0020). PRIVATE: reservado (chat, evidencia). */
+/** PUBLIC: se sirve sin sesión (foto, medios y certificados, ADR 0020). PRIVATE: solo con permiso (adjuntos del chat). */
 export enum FileVisibility {
   PUBLIC = 'PUBLIC',
   PRIVATE = 'PRIVATE',

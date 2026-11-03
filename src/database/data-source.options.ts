@@ -2,6 +2,15 @@ import type { DataSourceOptions } from 'typeorm';
 import { AdminAuditLog } from '../audit/entities/admin-audit-log.entity';
 import { AuthIdentity, OAuthPendingRequest } from '../auth/entities/auth-identity.entity';
 import { AuthSession } from '../auth/entities/auth-session.entity';
+import { Conversation, Message, MessageAttachment } from '../chat/entities/chat.entities';
+import { Notification } from '../notifications/entities/notification.entity';
+import {
+  Quote,
+  ServiceContract,
+  ServiceContractHistory,
+  ServiceRequest,
+  ServiceRequestTarget,
+} from '../requests/entities/requests.entities';
 import { OneTimeToken } from '../auth/entities/one-time-token.entity';
 import { UserMfaSettings } from '../auth/entities/user-mfa-settings.entity';
 import {
@@ -56,6 +65,15 @@ export const ENTITIES = [
   SubscriptionHistory,
   AuthIdentity,
   OAuthPendingRequest,
+  Conversation,
+  Message,
+  MessageAttachment,
+  ServiceRequest,
+  ServiceRequestTarget,
+  Quote,
+  ServiceContract,
+  ServiceContractHistory,
+  Notification,
 ];
 
 export interface ConnectionSettings {
