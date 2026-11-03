@@ -48,6 +48,12 @@ export interface StorageProvider {
   /** Idempotente: borrar algo que no existe no es un error. */
   delete(storageKey: string, kind: FileKind, access: Access): Promise<void>;
 
+  /**
+   * Pasa un archivo a público o privado en el proveedor (contenido ocultado o restaurado por el
+   * admin). En disco no hace nada: la API ya controla qué entrega.
+   */
+  setAccess(storageKey: string, kind: FileKind, access: Access): Promise<void>;
+
   /** URL pública (solo archivos PUBLIC). */
   publicUrl(storageKey: string, kind: FileKind, fileId: string): string;
 

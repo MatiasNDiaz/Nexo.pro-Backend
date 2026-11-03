@@ -362,7 +362,7 @@ export class ForumService {
   // ---- Admin ------------------------------------------------------------------------------------
 
   async moderatePost(admin: AuthUser, id: string, reason: string, hide: boolean): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
+    const fileIds = await this.dataSource.transaction(async (manager) => {
       await moderateContent(manager, this.audit, {
         entity: ForumPost,
         targetType: 'FORUM_POST',
@@ -381,7 +381,10 @@ export class ForumService {
             { visibility: hide ? FileVisibility.PRIVATE : FileVisibility.PUBLIC },
           );
       }
+      return media.map((m) => m.fileId);
     });
+    // Después del commit: también en Cloudinary (etapa 12).
+    await this.uploads.applyAccess(fileIds);
   }
 
   async moderateReply(admin: AuthUser, id: string, reason: string, hide: boolean): Promise<void> {

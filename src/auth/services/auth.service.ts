@@ -12,6 +12,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { AUDIT_LOGGER, type AuditLogger } from '../../audit/audit-logger';
 import { AuthUser } from '../../common/decorators';
 import { type AuthConfig, authConfig } from '../../config/auth.config';
+import { CaptchaService } from '../../integrations/abuse/captcha.service';
 import { User } from '../../users/entities/user.entity';
 import { AccountStatus, UserRole } from '../../users/user.enums';
 import { AuthEvents, TokenMailEvent, UserMailEvent } from '../auth.events';
@@ -58,20 +59,37 @@ export class AuthService {
     private readonly events: EventEmitter2,
     @Inject(authConfig.KEY) private readonly config: AuthConfig,
     @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
+    private readonly captcha: CaptchaService,
   ) {}
 
-  async login(email: string, password: string, meta: RequestMeta): Promise<LoginResult> {
+  /**
+   * Login con contraseña. Se auditan los intentos (SEG §20.2) con la IP seudonimizada; un email que
+   * no existe queda sin usuario asociado (no se guarda el email).
+   */
+  async login(
+    email: string,
+    password: string,
+    meta: RequestMeta,
+    captchaToken?: string,
+  ): Promise<LoginResult> {
+    // Después de varios fallos desde esta IP, CAPTCHA (si está activado; etapa 12).
+    await this.captcha.assertForLogin(meta.ipHash, captchaToken);
     const user = await this.findWithPassword({ email });
     if (!user) {
       // Mismo costo que una verificación real: el tiempo no revela si el email existe.
       await this.passwords.verifyDummy(password);
+      await this.loginFailed(null, meta, 'UNKNOWN_EMAIL');
       throw invalidCredentials();
     }
 
     const passwordOk = await this.passwords.verify(user.passwordHash, password);
-    if (this.isLocked(user)) throw invalidCredentials();
+    if (this.isLocked(user)) {
+      await this.loginFailed(user.id, meta, 'LOCKED');
+      throw invalidCredentials();
+    }
     if (!passwordOk || user.status === AccountStatus.DEACTIVATED) {
-      if (!passwordOk) await this.registerFailedAttempt(user.id);
+      if (!passwordOk) await this.registerFailedAttempt(user.id, meta);
+      await this.loginFailed(user.id, meta, passwordOk ? 'DEACTIVATED' : 'BAD_PASSWORD');
       throw invalidCredentials();
     }
 
@@ -79,7 +97,33 @@ export class AuthService {
       // Contraseña correcta, pero falta el segundo factor: todavía no hay sesión.
       return { kind: 'MFA_REQUIRED', userId: user.id };
     }
-    return { kind: 'SESSION', user, issued: await this.startSession(user, meta) };
+    const issued = await this.startSession(user, meta);
+    await this.recordLogin(user.id, true, meta, 'PASSWORD');
+    return { kind: 'SESSION', user, issued };
+  }
+
+  private async loginFailed(userId: string | null, meta: RequestMeta, cause: string) {
+    this.captcha.recordLoginFailure(meta.ipHash);
+    await this.recordLogin(userId, false, meta, cause);
+  }
+
+  /** `LOGIN_SUCCEEDED` / `LOGIN_FAILED` (SEG §20.2). Las alertas de seguridad cuentan los fallidos. */
+  async recordLogin(
+    userId: string | null,
+    success: boolean,
+    meta: RequestMeta,
+    detail: string,
+  ): Promise<void> {
+    await this.audit.record({
+      actorId: userId,
+      action: success ? 'LOGIN_SUCCEEDED' : 'LOGIN_FAILED',
+      targetType: 'USER',
+      targetId: userId,
+      reason: null,
+      result: success ? 'SUCCESS' : 'DENIED',
+      metadata: { method: success ? detail : 'PASSWORD', ...(!success && { cause: detail }) },
+      ipHash: meta.ipHash,
+    });
   }
 
   /**
@@ -107,7 +151,8 @@ export class AuthService {
       this.mfa.verifyAndConsume(manager, user.id, proof),
     );
     if (!valid) {
-      await this.registerFailedAttempt(user.id);
+      await this.registerFailedAttempt(user.id, meta);
+      await this.recordLogin(user.id, false, meta, 'BAD_MFA');
       throw this.invalidMfa();
     }
     const issued = await this.startSession(user, meta);
@@ -118,6 +163,7 @@ export class AuthService {
       targetId: user.id,
       reason: null,
       result: 'SUCCESS',
+      ipHash: meta.ipHash,
     });
     return { kind: 'SESSION', user, issued };
   }
@@ -189,7 +235,7 @@ export class AuthService {
       );
       if (!userId) throw invalidToken();
       const target = await manager.getRepository(User).findOneByOrFail({ id: userId });
-      this.passwords.assertAcceptable(newPassword, target);
+      await this.passwords.assertAcceptable(newPassword, target);
       await this.updatePassword(manager, target.id, newPassword);
       await this.sessions.revokeAllForUser(target.id, SessionRevokeReason.PASSWORD_RESET, {
         manager,
@@ -225,7 +271,7 @@ export class AuthService {
         message: 'La contraseña actual no es correcta.',
       });
     }
-    this.passwords.assertAcceptable(next, user);
+    await this.passwords.assertAcceptable(next, user);
     await this.dataSource.transaction(async (manager) => {
       await this.updatePassword(manager, user.id, next);
       await this.sessions.revokeAllForUser(user.id, SessionRevokeReason.PASSWORD_CHANGED, {
@@ -261,7 +307,7 @@ export class AuthService {
       });
     }
     await this.sessions.assertRecentLogin(authUser);
-    this.passwords.assertAcceptable(next, user);
+    await this.passwords.assertAcceptable(next, user);
     await this.dataSource.transaction(async (manager) => {
       await this.updatePassword(manager, user.id, next);
       await this.audit.record(
@@ -322,7 +368,7 @@ export class AuthService {
   }
 
   /** Suma un intento fallido de forma atómica y, al cruzar un umbral, bloquea y audita. */
-  private async registerFailedAttempt(userId: string): Promise<void> {
+  private async registerFailedAttempt(userId: string, meta?: RequestMeta): Promise<void> {
     const [rows]: [Array<{ failed_login_attempts: number }>, number] = await this.dataSource.query(
       `UPDATE users SET failed_login_attempts = failed_login_attempts + 1
        WHERE id = $1 RETURNING failed_login_attempts`,
@@ -344,6 +390,7 @@ export class AuthService {
         reason: null,
         result: 'DENIED',
         metadata: { failedAttempts: attempts, lockMinutes: minutes },
+        ipHash: meta?.ipHash ?? null,
       });
     }
   }

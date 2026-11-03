@@ -5,7 +5,10 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  Optional,
 } from '@nestjs/common';
+import { ErrorCounters } from '../../monitoring/error-counters';
+import { ErrorReporter } from '../../monitoring/error-reporter';
 import type { Request, Response } from 'express';
 import { QueryFailedError } from 'typeorm';
 import { ApiErrorBody, ApiErrorDetail, DEFAULT_ERROR_CODES } from '../errors/api-error';
@@ -27,14 +30,22 @@ interface ResolvedError {
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
+  /** Opcionales: los tests unitarios crean el filtro sin ellos. */
+  constructor(
+    @Optional() private readonly counters?: ErrorCounters,
+    @Optional() private readonly errorReporter?: ErrorReporter,
+  ) {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const http = host.switchToHttp();
     const request = http.getRequest<Request & { id?: unknown }>();
     const response = http.getResponse<Response>();
 
     const resolved = resolve(exception);
+    this.counters?.record(resolved.status);
     if (resolved.status >= 500) {
       this.logger.error(exception instanceof Error ? exception : String(exception));
+      this.errorReporter?.capture(exception);
     }
 
     const body: ApiErrorBody = {

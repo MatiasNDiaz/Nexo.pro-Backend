@@ -10,6 +10,7 @@ import { AuthMailListener } from './auth-mail.listener';
 import { AuthController } from './auth.controller';
 import { GoogleAuthController } from './google/google-auth.controller';
 import { GoogleAuthService } from './google/google-auth.service';
+import { AuthCleanupJob } from './auth-cleanup.job';
 import { AuthCookiesService } from './services/auth-cookies.service';
 import { AuthService } from './services/auth.service';
 import { CsrfService } from './services/csrf.service';
@@ -47,6 +48,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     JwtStrategy,
     AuthMailListener,
     GoogleAuthService,
+    AuthCleanupJob,
   ],
   exports: [CsrfService, SessionsService, PasswordService, AuthCookiesService, TokenService],
 })

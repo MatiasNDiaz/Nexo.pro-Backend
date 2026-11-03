@@ -2,6 +2,7 @@ import { ConflictException, Inject, Injectable, Logger, NotFoundException } from
 import { DataSource, EntityManager } from 'typeorm';
 import { AUDIT_LOGGER, type AuditLogger } from '../audit/audit-logger';
 import type { AuthUser } from '../common/decorators';
+import { CaptchaService } from '../integrations/abuse/captcha.service';
 import { MAIL_PROVIDER, type MailProvider } from '../integrations/mail/mail-provider';
 import {
   type Notification,
@@ -40,6 +41,7 @@ export class SupportService {
     private readonly notifications: NotificationsService,
     @Inject(MAIL_PROVIDER) private readonly mail: MailProvider,
     @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
+    private readonly captcha: CaptchaService,
   ) {}
 
   async create(user: AuthUser, dto: CreateTicketDto): Promise<TicketDto> {
@@ -58,6 +60,7 @@ export class SupportService {
 
   /** Formulario público: guarda la consulta para responderla por email. */
   async contact(dto: ContactDto): Promise<{ received: true }> {
+    await this.captcha.assert(dto.captchaToken);
     const created: Notification[] = [];
     await this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(SupportTicket);

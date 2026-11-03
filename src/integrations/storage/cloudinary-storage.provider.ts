@@ -117,10 +117,26 @@ export class CloudinaryStorageProvider implements StorageProvider {
     };
   }
 
+  /**
+   * Borra con el tipo esperado y también con el otro: si un cambio de acceso (ocultar o restaurar)
+   * quedó a medias, el archivo igual se borra. Borrar lo que no existe no falla.
+   */
   async delete(storageKey: string, kind: FileKind, access: Access): Promise<void> {
-    await cloudinary.uploader.destroy(storageKey, {
+    for (const type of [DELIVERY_TYPE[access], DELIVERY_TYPE[other(access)]]) {
+      await cloudinary.uploader.destroy(storageKey, {
+        resource_type: RESOURCE_TYPE[kind],
+        type,
+        invalidate: true,
+      });
+    }
+  }
+
+  /** Público ↔ privado (`upload` ↔ `authenticated`): la URL pública deja de responder al ocultar. */
+  async setAccess(storageKey: string, kind: FileKind, access: Access): Promise<void> {
+    await cloudinary.uploader.rename(storageKey, storageKey, {
       resource_type: RESOURCE_TYPE[kind],
-      type: DELIVERY_TYPE[access],
+      type: DELIVERY_TYPE[other(access)],
+      to_type: DELIVERY_TYPE[access],
       invalidate: true,
     });
   }
@@ -149,6 +165,8 @@ const DELIVERY_TYPE: Record<Access, 'upload' | 'authenticated'> = {
   public: 'upload',
   private: 'authenticated',
 };
+
+const other = (access: Access): Access => (access === 'public' ? 'private' : 'public');
 
 /** El SDK rechaza con `{ error: { http_code } }` (o `{ http_code }` según la versión). */
 function httpCodeOf(error: unknown): number | undefined {

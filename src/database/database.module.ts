@@ -8,7 +8,12 @@ import { buildDataSourceOptions } from './data-source.options';
     TypeOrmModule.forRootAsync({
       inject: [databaseConfig.KEY],
       useFactory: (db: DatabaseConfig) => ({
-        ...buildDataSourceOptions({ url: db.url, ssl: db.ssl, poolMax: db.poolMax }),
+        ...buildDataSourceOptions({
+          url: db.url,
+          ssl: db.ssl,
+          poolMax: db.poolMax,
+          statementTimeoutMs: db.statementTimeoutMs,
+        }),
         retryAttempts: 5,
         retryDelay: 2000,
       }),

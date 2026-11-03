@@ -30,7 +30,7 @@ export class AuditService implements AuditLogger {
       reason: entry.reason,
       result: entry.result as AuditResult,
       metadata: sanitizeAuditMetadata(entry.metadata),
-      ipHash: null,
+      ipHash: entry.ipHash ?? null,
     });
   }
 }

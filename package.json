@@ -28,6 +28,7 @@
     "migration:show": "npm run build && typeorm migration:show -d dist/database/data-source.js",
     "seed:catalogs": "npm run build && node dist/database/seeds/run-catalog-seed.js",
     "admin:create": "npm run build && node dist/auth/cli/create-admin.js",
+    "admin:reset-mfa": "npm run build && node dist/auth/cli/reset-admin-mfa.js",
     "accounts:purge": "npm run build && node dist/users/cli/purge-deleted-accounts.js"
   },
   "dependencies": {
@@ -44,6 +45,7 @@
     "@nestjs/throttler": "6.7.1",
     "@nestjs/typeorm": "12.0.2",
     "@nestjs/websockets": "12.3.2",
+    "@sentry/nestjs": "11.8.0",
     "argon2": "0.45.1",
     "class-transformer": "0.5.1",
     "class-validator": "0.15.1",

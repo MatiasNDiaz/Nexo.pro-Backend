@@ -4,6 +4,7 @@ import { AUDIT_LOGGER, type AuditLogger } from '../audit/audit-logger';
 import type { AuthUser } from '../common/decorators';
 import { StoredFile } from '../uploads/entities/stored-file.entity';
 import { FileVisibility } from '../uploads/file.enums';
+import { UploadsService } from '../uploads/uploads.service';
 import { ProfessionalCertification } from './entities/professional-certification.entity';
 import { ProfessionalMedia } from './entities/professional-media.entity';
 import { CertStatus, MediaStatus } from './professional.enums';
@@ -29,13 +30,14 @@ const CONFIG = {
 
 /**
  * El admin oculta (y restaura) medios y certificados con motivo y auditoría (FI §6.3, ADR 0020).
- * No hay aprobación previa: el contenido se publica al subirse. Al ocultarlo, el archivo deja de
- * ser público en el adaptador local; con Cloudinary, deja de aparecer en la API (ver pendientes).
+ * No hay aprobación previa: el contenido se publica al subirse. Al ocultarlo, el archivo pasa a
+ * privado también en Cloudinary (etapa 12): su URL pública deja de responder.
  */
 @Injectable()
 export class ContentModerationService {
   constructor(
     private readonly dataSource: DataSource,
+    private readonly uploads: UploadsService,
     @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
   ) {}
 
@@ -55,7 +57,7 @@ export class ContentModerationService {
     hide: boolean,
   ): Promise<void> {
     const config = CONFIG[target];
-    await this.dataSource.transaction(async (manager) => {
+    const fileId = await this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository<ProfessionalMedia | ProfessionalCertification>(
         config.entity,
       );
@@ -93,7 +95,10 @@ export class ContentModerationService {
         },
         manager,
       );
+      return row.fileId;
     });
+    // Después del commit: en Cloudinary el archivo oculto deja de tener URL pública.
+    await this.uploads.applyAccess([fileId]);
   }
 
   private async setFileVisibility(manager: EntityManager, fileId: string, hide: boolean) {

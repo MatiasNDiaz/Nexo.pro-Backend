@@ -118,6 +118,11 @@ export interface ConnectionSettings {
   url: string;
   ssl: boolean;
   poolMax: number;
+  /**
+   * Corta las consultas que tardan más que esto (y las transacciones abiertas sin actividad). Solo
+   * la app: las migraciones pueden tardar más.
+   */
+  statementTimeoutMs?: number;
 }
 
 /** Opciones compartidas por la app, la CLI de migraciones y los tests. */
@@ -139,6 +144,15 @@ export function buildDataSourceOptions(connection: ConnectionSettings): DataSour
     // el usuario de runtime no tiene permisos para hacerlo.
     uuidExtension: 'pgcrypto',
     installExtensions: false,
-    extra: { max: connection.poolMax, application_name: 'nexo-pro-api' },
+    extra: {
+      max: connection.poolMax,
+      application_name: 'nexo-pro-api',
+      // Sin base, que el pedido falle rápido en lugar de quedar colgado.
+      connectionTimeoutMillis: 10_000,
+      ...(connection.statementTimeoutMs && {
+        statement_timeout: connection.statementTimeoutMs,
+        idle_in_transaction_session_timeout: connection.statementTimeoutMs * 2,
+      }),
+    },
   };
 }

@@ -126,6 +126,13 @@ export class EnvironmentVariables {
   @Max(50)
   DB_POOL_MAX = 10;
 
+  /** Tiempo máximo de una consulta de la app (las migraciones no lo usan). */
+  @Transform(toInt)
+  @IsInt()
+  @Min(1000)
+  @Max(120_000)
+  DB_STATEMENT_TIMEOUT_MS = 15_000;
+
   // ---- Autenticación (etapa 5, ADR 0008) ----
 
   /** URL base del frontend para los enlaces de los emails. Nunca se arma con el header Host. */
@@ -306,6 +313,26 @@ export class EnvironmentVariables {
   @Matches(ORIGIN_PATTERN)
   API_PUBLIC_URL?: string;
 
+  // ---- Antiabuso (etapa 12) ----
+
+  /** Rechaza contraseñas filtradas (Have I Been Pwned, k-anonimato). Apagado por defecto. */
+  @Transform(toBoolean)
+  @IsBoolean()
+  PASSWORD_BREACH_CHECK = false;
+
+  /** Clave secreta de Cloudflare Turnstile. Sin ella, el CAPTCHA queda apagado. */
+  @IsOptional()
+  @IsString()
+  @MinLength(20)
+  TURNSTILE_SECRET_KEY?: string;
+
+  // ---- Monitoreo (etapa 12) ----
+
+  /** DSN de Sentry. Sin él, el reporte de errores queda apagado. */
+  @IsOptional()
+  @Matches(/^https:\/\/[A-Za-z0-9]+@[a-z0-9.-]+\/\d+$/)
+  SENTRY_DSN?: string;
+
   /** Días que una cuenta dada de baja queda restaurable antes de anonimizarse (ADR 0016). */
   @Transform(toInt)
   @IsInt()
@@ -378,6 +405,9 @@ function productionRules(env: EnvironmentVariables): string[] {
   if (env.API_PUBLIC_URL && !env.API_PUBLIC_URL.startsWith('https://')) {
     problems.push('API_PUBLIC_URL (en producción debe ser https)');
   }
+  // Railway pone un proxy delante: sin confiar en él, todos los pedidos llegan con la IP del proxy
+  // y el límite por IP (y el bloqueo de fuerza bruta por IP) dejan de servir.
+  if (env.TRUST_PROXY < 1) problems.push('TRUST_PROXY (en producción va 1: el proxy de Railway)');
   if (env.SWAGGER_ENABLED) problems.push('SWAGGER_ENABLED (no se permite en producción)');
   if (env.FRONTEND_ORIGINS.some((origin) => !origin.startsWith('https://'))) {
     problems.push('FRONTEND_ORIGINS (en producción todos los orígenes deben ser https)');

@@ -15,6 +15,9 @@ import { FavoritesModule } from './favorites/favorites.module';
 import { ForumModule } from './forum/forum.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { AdminPanelModule } from './admin/admin-panel.module';
+import { MonitoringModule } from './monitoring/monitoring.module';
+import { AbuseModule } from './integrations/abuse/abuse.module';
+import { abuseConfig } from './config/abuse.config';
 import { ModerationModule } from './moderation/moderation.module';
 import { SupportModule } from './support/support.module';
 import { RealtimeModule } from './realtime/realtime.module';
@@ -66,6 +69,7 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
         identityConfig,
         googleConfig,
         paymentsConfig,
+        abuseConfig,
       ],
       // Falla al iniciar si el entorno es inválido. Devuelve las variables crudas para que
       // @nestjs/config las copie a process.env (solo copia strings/números/booleanos, no listas);
@@ -93,6 +97,8 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
     }),
     DatabaseModule,
     AuditModule,
+    MonitoringModule,
+    AbuseModule,
     MailModule,
     HealthModule,
     LocationsModule,

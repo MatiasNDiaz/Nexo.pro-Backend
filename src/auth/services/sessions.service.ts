@@ -11,6 +11,9 @@ import { AuthSession, SessionRevokeReason } from '../entities/auth-session.entit
 import { RequestMeta } from '../request-meta';
 import { TokenService } from './token.service';
 
+/** Dispositivos con sesión abierta por usuario (aprobado el 03/11/2026). */
+export const MAX_DEVICES = 10;
+
 /** Ventana de un inicio de sesión reciente (ADR 0023). */
 export const RECENT_LOGIN_MS = 10 * 60 * 1000;
 
@@ -52,7 +55,10 @@ export class SessionsService {
     @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
   ) {}
 
-  /** Sesión nueva (familia nueva) en cada login: nunca se reutiliza una existente. */
+  /**
+   * Sesión nueva (familia nueva) en cada login: nunca se reutiliza una existente. Con más de
+   * `MAX_DEVICES` dispositivos activos se cierran los que hace más tiempo no se usan (etapa 12).
+   */
   async create(
     user: { id: string; role: UserRole },
     meta: RequestMeta,
@@ -60,7 +66,23 @@ export class SessionsService {
   ): Promise<IssuedSession> {
     const now = new Date();
     const familyExpiresAt = addSeconds(now, this.ttl(user.role).absolute);
-    return this.insertRow(manager, user, randomUUID(), familyExpiresAt, meta, now);
+    const issued = await this.insertRow(manager, user, randomUUID(), familyExpiresAt, meta, now);
+    // Una fila vigente por dispositivo; la más reciente es la del último uso.
+    const active = await manager.getRepository(AuthSession).find({
+      where: { userId: user.id, revokedAt: IsNull(), expiresAt: MoreThan(now) },
+      order: { createdAt: 'DESC' },
+      select: { id: true, familyId: true },
+    });
+    const excess = active.slice(MAX_DEVICES).map((row) => row.familyId);
+    if (excess.length) {
+      await manager
+        .createQueryBuilder()
+        .update(AuthSession)
+        .set({ revokedAt: now, revokeReason: SessionRevokeReason.SESSION_CLOSED })
+        .where('family_id IN (:...excess) AND revoked_at IS NULL', { excess })
+        .execute();
+    }
+    return issued;
   }
 
   /**

@@ -15,6 +15,8 @@ export interface AuditEntry {
   reason: string | null;
   result: `${AuditResult}`;
   metadata?: AuditMetadata;
+  /** IP seudonimizada (HMAC, `request-meta.ts`): nunca la IP en claro. */
+  ipHash?: string | null;
 }
 
 export interface AuditLogger {

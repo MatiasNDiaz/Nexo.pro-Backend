@@ -92,7 +92,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<SessionResponseDto | MfaRequiredDto> {
-    const result = await this.auth.login(dto.email, dto.password, this.meta(req));
+    const result = await this.auth.login(dto.email, dto.password, this.meta(req), dto.captchaToken);
     if (result.kind === 'MFA_REQUIRED') {
       const challenge = await this.tokens.signMfaChallenge(result.userId);
       this.cookies.set(res, 'mfa', challenge, 5 * 60);

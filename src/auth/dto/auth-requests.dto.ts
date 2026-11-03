@@ -27,6 +27,12 @@ export class LoginDto {
   @IsString()
   @MaxLength(PASSWORD_MAX_LENGTH)
   password: string;
+
+  @ApiPropertyOptional({ description: 'Turnstile: solo si la API respondió CAPTCHA_REQUIRED' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  captchaToken?: string;
 }
 
 /** Segundo factor del admin: un código TOTP o, si perdió el dispositivo, un código de recuperación. */

@@ -117,4 +117,10 @@ export class RegisterDto {
   @ValidateNested({ each: true })
   @Type(() => ServiceAreaInputDto)
   serviceAreas?: ServiceAreaInputDto[];
+
+  @ApiPropertyOptional({ description: 'Turnstile: obligatorio cuando el CAPTCHA está activado' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  captchaToken?: string;
 }

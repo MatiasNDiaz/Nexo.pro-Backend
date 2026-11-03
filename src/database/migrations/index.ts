@@ -19,6 +19,7 @@ import { ChatRequestsContracts1793640017000 } from './1793640017000-ChatRequests
 import { Payments1793640018000 } from './1793640018000-Payments';
 import { ReviewsFavoritesForum1793640019000 } from './1793640019000-ReviewsFavoritesForum';
 import { Moderation1793640020000 } from './1793640020000-Moderation';
+import { Hardening1793640021000 } from './1793640021000-Hardening';
 
 /**
  * Lista explícita (en orden) de migraciones. Se registran a mano en vez de con un glob para que
@@ -47,4 +48,5 @@ export const MIGRATIONS = [
   Payments1793640018000,
   ReviewsFavoritesForum1793640019000,
   Moderation1793640020000,
+  Hardening1793640021000,
 ];

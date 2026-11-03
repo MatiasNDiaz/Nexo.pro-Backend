@@ -33,6 +33,8 @@ export enum SessionRevokeReason {
 @Index(['userId'])
 @Index(['familyId'])
 @Index(['replacedById'])
+// La limpieza diaria borra las vencidas (etapa 12).
+@Index(['expiresAt'])
 export class AuthSession {
   @PrimaryGeneratedColumn('uuid')
   id: string;

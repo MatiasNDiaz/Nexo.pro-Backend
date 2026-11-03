@@ -93,9 +93,33 @@ describe('CloudinaryStorageProvider', () => {
       type: 'upload',
       invalidate: true,
     });
+    // También con el otro tipo: si ocultar o restaurar quedó a medias, igual se borra.
+    expect(destroy).toHaveBeenCalledWith('nexo-test/x/y', {
+      resource_type: 'image',
+      type: 'authenticated',
+      invalidate: true,
+    });
     expect(provider.publicUrl('nexo-test/x/y', FileKind.IMAGE)).toMatch(
       /^https:\/\/res\.cloudinary\.com\/nube-test\/image\/upload\/(v1\/)?nexo-test\/x\/y$/,
     );
+  });
+
+  it('ocultar pasa el archivo a authenticated (sin URL pública); restaurar lo devuelve', async () => {
+    const rename = jest.spyOn(cloudinary.uploader, 'rename').mockResolvedValue({});
+    await provider.setAccess('nexo-test/x/y', FileKind.VIDEO, 'private');
+    expect(rename).toHaveBeenLastCalledWith('nexo-test/x/y', 'nexo-test/x/y', {
+      resource_type: 'video',
+      type: 'upload',
+      to_type: 'authenticated',
+      invalidate: true,
+    });
+    await provider.setAccess('nexo-test/x/y', FileKind.VIDEO, 'public');
+    expect(rename).toHaveBeenLastCalledWith('nexo-test/x/y', 'nexo-test/x/y', {
+      resource_type: 'video',
+      type: 'authenticated',
+      to_type: 'upload',
+      invalidate: true,
+    });
   });
 
   it('los privados se suben como authenticated y se entregan con enlace firmado que vence', () => {

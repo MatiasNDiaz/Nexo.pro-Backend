@@ -10,7 +10,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { DataSource, EntityManager, In, LessThan, Not } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, LessThan, Not } from 'typeorm';
 import type { AuthUser } from '../common/decorators';
 import { LocalStorageProvider } from '../integrations/storage/local-storage.provider';
 import {
@@ -329,13 +329,56 @@ export class UploadsService {
     return files;
   }
 
-  /** Borra binarios del proveedor. Un fallo no corta el flujo: queda en el log para reintentarlo. */
-  async deleteFromStorage(files: StoredFile[]): Promise<void> {
+  /**
+   * Borra binarios del proveedor y lo marca (`storage_deleted_at`). Un fallo no corta el flujo:
+   * queda sin marca y la tarea horaria lo reintenta. Devuelve cuántos borró.
+   */
+  async deleteFromStorage(files: StoredFile[]): Promise<number> {
+    let deleted = 0;
     for (const file of files) {
       try {
         await this.storage.delete(file.storageKey, file.kind, accessOf(file));
+        await this.dataSource
+          .getRepository(StoredFile)
+          .update(file.id, { storageDeletedAt: new Date() });
+        deleted++;
       } catch {
         this.logger.warn(`No se pudo borrar del almacenamiento el archivo ${file.id}`);
+      }
+    }
+    return deleted;
+  }
+
+  /**
+   * Reintenta los archivos DELETED que siguen en el proveedor (tarea horaria). Espera una hora
+   * desde la baja para no pisarse con el borrado que corre justo después del commit.
+   */
+  async retryPendingDeletions(now = new Date(), batchSize = 100): Promise<number> {
+    const pending = await this.dataSource.getRepository(StoredFile).find({
+      where: {
+        status: FileStatus.DELETED,
+        storageDeletedAt: IsNull(),
+        updatedAt: LessThan(new Date(now.getTime() - 60 * 60 * 1000)),
+      },
+      order: { updatedAt: 'ASC' },
+      take: batchSize,
+    });
+    return this.deleteFromStorage(pending);
+  }
+
+  /**
+   * Lleva al proveedor el acceso que ya quedó en la base (contenido ocultado o restaurado por el
+   * admin, después del commit): oculto, su URL pública deja de responder. Si falla, se registra;
+   * borrar igual funciona (prueba los dos tipos) y el admin puede repetir la acción.
+   */
+  async applyAccess(fileIds: string[]): Promise<void> {
+    if (!fileIds.length) return;
+    const files = await this.dataSource.getRepository(StoredFile).findBy({ id: In(fileIds) });
+    for (const file of files) {
+      try {
+        await this.storage.setAccess(file.storageKey, file.kind, accessOf(file));
+      } catch {
+        this.logger.error(`No se pudo cambiar el acceso del archivo ${file.id} en el proveedor`);
       }
     }
   }

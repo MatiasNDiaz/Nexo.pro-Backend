@@ -64,6 +64,12 @@ export class ContactDto {
   @IsString()
   @Length(10, 2000)
   body: string;
+
+  @ApiPropertyOptional({ description: 'Turnstile: obligatorio cuando el CAPTCHA está activado' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  captchaToken?: string;
 }
 
 export class TicketMessageInputDto {

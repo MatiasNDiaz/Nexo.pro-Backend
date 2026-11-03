@@ -38,6 +38,8 @@ export enum NotificationType {
   SUPPORT_REPLY = 'SUPPORT_REPLY',
   ANNOUNCEMENT = 'ANNOUNCEMENT',
   ADMIN_MESSAGE = 'ADMIN_MESSAGE',
+  /** Al admin: picos de logins fallidos, tokens reutilizados, 401/403 o 500 (SEG §20.3). */
+  SECURITY_ALERT = 'SECURITY_ALERT',
 }
 
 export enum NotificationTarget {

@@ -9,6 +9,7 @@ export const databaseConfig = registerAs('database', () => {
     migrationsUrl: env.DATABASE_MIGRATIONS_URL ?? env.DATABASE_URL,
     ssl: env.DB_SSL,
     poolMax: env.DB_POOL_MAX,
+    statementTimeoutMs: env.DB_STATEMENT_TIMEOUT_MS,
   };
 });
 

@@ -428,7 +428,9 @@ export class GoogleAuthService {
   }
 
   private async openSession(req: Request, res: Response, user: User): Promise<SessionResponseDto> {
-    const issued = await this.auth.startSession(user, requestMeta(req, this.security.hmacKey));
+    const meta = requestMeta(req, this.security.hmacKey);
+    const issued = await this.auth.startSession(user, meta);
+    await this.auth.recordLogin(user.id, true, meta, 'GOOGLE');
     return this.responder.respond(res, user, issued);
   }
 

@@ -28,6 +28,8 @@ import {
 @Index(['ownerUserId'])
 // Parcial (solo pendientes): creado en la migración.
 @Index('ix_stored_files_pending', { synchronize: false })
+// Parcial (DELETED sin borrar del almacenamiento): la tarea de reintento (etapa 12).
+@Index('ix_stored_files_storage_pending', { synchronize: false })
 @Check('ck_stored_files_provider', "provider IN ('CLOUDINARY', 'LOCAL')")
 @Check(
   'ck_stored_files_metadata',
@@ -81,6 +83,13 @@ export class StoredFile {
   /** Solo videos (máximo 15 s; la constraint deja 0,5 s de margen por redondeo del contenedor). */
   @Column({ type: 'int', nullable: true })
   durationMs: number | null;
+
+  /**
+   * Cuándo se borró de verdad del almacenamiento. Un archivo DELETED sin esta fecha todavía está en
+   * el proveedor: la tarea horaria lo reintenta (etapa 12).
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  storageDeletedAt: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;

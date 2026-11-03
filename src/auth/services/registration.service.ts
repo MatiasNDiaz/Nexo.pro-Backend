@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import { AUDIT_LOGGER, type AuditLogger } from '../../audit/audit-logger';
 import { type AuthConfig, authConfig } from '../../config/auth.config';
+import { CaptchaService } from '../../integrations/abuse/captcha.service';
 import { NeighborhoodsService } from '../../locations/neighborhoods.service';
 import { ProfessionalsService } from '../../professionals/professionals.service';
 import { User } from '../../users/entities/user.entity';
@@ -38,11 +39,13 @@ export class RegistrationService {
     private readonly events: EventEmitter2,
     @Inject(authConfig.KEY) private readonly config: AuthConfig,
     @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
+    private readonly captcha: CaptchaService,
   ) {}
 
   async register(dto: RegisterDto): Promise<void> {
     this.assertRoleFields(dto);
-    this.passwords.assertAcceptable(dto.password, { role: dto.role, email: dto.email });
+    await this.captcha.assert(dto.captchaToken);
+    await this.passwords.assertAcceptable(dto.password, { role: dto.role, email: dto.email });
     // Se hashea siempre (también si el email existe) para que el tiempo de respuesta no lo delate.
     const passwordHash = await this.passwords.hash(dto.password);
 

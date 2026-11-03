@@ -89,6 +89,11 @@ export class LocalStorageProvider implements StorageProvider {
     await rm(this.pathOf(storageKey), { force: true });
   }
 
+  /** En disco el acceso lo controla la API (solo entrega archivos PUBLIC): no hay nada que mover. */
+  setAccess(): Promise<void> {
+    return Promise.resolve();
+  }
+
   publicUrl(_storageKey: string, _kind: FileKind, fileId: string): string {
     return this.contentPath(fileId);
   }

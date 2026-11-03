@@ -113,7 +113,12 @@ describe('validateEnv', () => {
       FRONTEND_ORIGINS: 'https://app.example.com',
       FRONTEND_URL: 'https://app.example.com',
       COOKIE_SECURE: 'true',
+      TRUST_PROXY: '1',
     };
+
+    it('exige confiar en el proxy (límite por IP real detrás de Railway)', () => {
+      expect(() => validateEnv({ ...prod, TRUST_PROXY: '0' })).toThrow(/TRUST_PROXY/);
+    });
 
     it('exige un proveedor real de email: consola y memoria filtrarían o perderían los enlaces', () => {
       // Hoy no hay proveedor real (pendiente): la API todavía no puede arrancar en producción.

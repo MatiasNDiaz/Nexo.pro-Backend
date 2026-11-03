@@ -5,7 +5,8 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'node_modules', 'docs', 'eslint.config.mjs'] },
+  // `ops/`: scripts de operación (k6, shell) que no son código de la app ni corren en Node.
+  { ignores: ['dist', 'coverage', 'node_modules', 'docs', 'ops', 'eslint.config.mjs'] },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   prettier,
