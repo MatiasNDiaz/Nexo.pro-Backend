@@ -33,5 +33,6 @@ Formato: contexto, decisión, consecuencias, fecha. Para cambiar una decisión s
 | [0026](0026-pagos-con-mercado-pago.md)                  | Pagos con Mercado Pago: checkout manual mensual, control de coincidencia y reversión por reembolso o contracargo                      |
 | [0027](0027-chat-sin-plan-con-contratacion-en-curso.md) | Sin plan vigente, el chat sigue solo con una contratación en curso, hasta que se cierre (C-12)                                        |
 | [0028](0028-resenas-favoritos-y-foro.md)                | Reseñas (solo terminadas, 30 días para reseñar y editar), favoritos con avisos, foro y opiniones de la plataforma                     |
+| [0029](0029-moderacion-sanciones-y-soporte.md)          | Moderación manual: reportes, strikes, sanciones y apelaciones; chat solo desde un reporte de mensaje; soporte y novedades             |
 
 Las decisiones todavía abiertas están en [pendientes.md](pendientes.md).

@@ -17,7 +17,8 @@ Monolito modular NestJS (plan §5–7). Controllers delgados, reglas de negocio 
 | 8 Chat y contrataciones     | Hecha: chat con adjuntos privados, solicitudes a varios profesionales, presupuestos, contrataciones con transiciones, notificaciones internas y tiempo real (Socket.IO)                                  |
 | 9 Pagos                     | Hecha (en revisión): checkout manual de Mercado Pago (adaptador simulado), webhook firmado e idempotente, control de coincidencia, reversión por reembolso, cambios de plan y vencimientos               |
 | 10 Reputación y comunidad   | Hecha (en revisión): reseñas con respuesta del profesional, favoritos con avisos, foro con respuestas anidadas y "me gusta", opiniones de la plataforma; chat sin plan con contratación en curso         |
-| 11–13                       | Pendientes (ver `docs/roadmap.md`)                                                                                                                                                                       |
+| 11 Moderación y soporte     | Hecha (en revisión): reportes, strikes y sanciones manuales, apelaciones, chat solo desde un reporte de mensaje, soporte y contacto público, novedades y panel del admin                                 |
+| 12–13                       | Pendientes (ver `docs/roadmap.md`)                                                                                                                                                                       |
 
 ## Estructura actual
 
@@ -64,6 +65,9 @@ src/
 ├── reviews/                # reseñas, respuesta del profesional y opiniones de la plataforma
 ├── favorites/              # favoritos y avisos de disponibilidad
 ├── forum/                  # publicaciones, respuestas anidadas, "me gusta" y moderación
+├── moderation/             # reportes, strikes, sanciones, apelaciones, señales de alerta, vencimientos
+├── support/                # soporte, contacto público, novedades y mensajes del admin
+├── admin/                  # panel: cifras, búsqueda de usuarios y ficha completa
 ├── uploads/                # stored_files, tickets de subida, confirmación, foto de perfil, limpieza
 ├── identity-verification/  # intentos, webhook del proveedor, cola y decisiones del admin
 ├── audit/                  # AuditService (puerto AUDIT_LOGGER), global

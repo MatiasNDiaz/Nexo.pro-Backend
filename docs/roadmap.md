@@ -18,8 +18,8 @@ Detalle de alcance, bloqueos y criterios de aceptación: plan §16. Una rama por
 | **7B** | **Login con Google** para clientes y profesionales (ADR 0015)                                                                              | ✅ Aprobada (adaptador simulado) |
 | 8      | Chat, solicitudes y contrataciones; notificaciones internas y tiempo real                                                                  | ✅ Aprobada                      |
 | 9      | Suscripciones y pagos con Mercado Pago (ADR 0026)                                                                                          | ✅ Aprobada (adaptador simulado) |
-| 10     | Reputación y comunidad: reseñas, favoritos, foro (ADR 0027 y 0028)                                                                         | En revisión                      |
-| 11     | Moderación, soporte, administración y auditoría                                                                                            | Pendiente                        |
+| 10     | Reputación y comunidad: reseñas, favoritos, foro (ADR 0027 y 0028)                                                                         | ✅ Aprobada                      |
+| 11     | Moderación, soporte, administración y auditoría (ADR 0029)                                                                                 | En revisión                      |
 | 12     | Hardening y preparación para producción                                                                                                    | Pendiente                        |
 | 13     | Premium y avanzadas: métricas, push, WhatsApp, chatbot/agenda, identidad automática                                                        | Pendiente                        |
 
