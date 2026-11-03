@@ -9,6 +9,8 @@ export enum FilePurpose {
   CHAT_ATTACHMENT = 'CHAT_ATTACHMENT',
   /** Fotos y video de las publicaciones del foro (ADR 0028): públicos. */
   FORUM_MEDIA = 'FORUM_MEDIA',
+  /** Fotos de reportes y de soporte (ADR 0029): privadas, las ven el autor y el admin. */
+  EVIDENCE = 'EVIDENCE',
 }
 
 export enum FileKind {

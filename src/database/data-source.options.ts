@@ -16,6 +16,14 @@ import {
 } from '../forum/entities/forum.entities';
 import { PlatformReview, Review } from '../reviews/entities/review.entity';
 import {
+  Appeal,
+  Report,
+  ReportEvidence,
+  Sanction,
+  Strike,
+} from '../moderation/entities/moderation.entities';
+import { Announcement, SupportMessage, SupportTicket } from '../support/entities/support.entities';
+import {
   Quote,
   ServiceContract,
   ServiceContractHistory,
@@ -96,6 +104,14 @@ export const ENTITIES = [
   ForumReply,
   ForumPostLike,
   ForumReplyLike,
+  Report,
+  ReportEvidence,
+  Strike,
+  Sanction,
+  Appeal,
+  SupportTicket,
+  SupportMessage,
+  Announcement,
 ];
 
 export interface ConnectionSettings {

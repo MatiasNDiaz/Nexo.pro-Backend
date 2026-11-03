@@ -18,6 +18,7 @@ import { GoogleLogin1793640016000 } from './1793640016000-GoogleLogin';
 import { ChatRequestsContracts1793640017000 } from './1793640017000-ChatRequestsContracts';
 import { Payments1793640018000 } from './1793640018000-Payments';
 import { ReviewsFavoritesForum1793640019000 } from './1793640019000-ReviewsFavoritesForum';
+import { Moderation1793640020000 } from './1793640020000-Moderation';
 
 /**
  * Lista explícita (en orden) de migraciones. Se registran a mano en vez de con un glob para que
@@ -45,4 +46,5 @@ export const MIGRATIONS = [
   ChatRequestsContracts1793640017000,
   Payments1793640018000,
   ReviewsFavoritesForum1793640019000,
+  Moderation1793640020000,
 ];

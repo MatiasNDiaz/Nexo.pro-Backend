@@ -85,6 +85,14 @@ export const FILE_POLICIES: Record<FilePurpose, FilePolicy> = {
     needsPlan: false,
     maxBytes: (kind) => (kind === FileKind.VIDEO ? 30 * MB : 5 * MB),
   },
+  [FilePurpose.EVIDENCE]: {
+    kinds: [FileKind.IMAGE],
+    roles: [UserRole.CUSTOMER, UserRole.PROFESSIONAL],
+    visibility: FileVisibility.PRIVATE,
+    folder: 'evidence',
+    needsPlan: false,
+    maxBytes: () => 5 * MB,
+  },
   [FilePurpose.CERTIFICATE]: {
     kinds: [FileKind.IMAGE, FileKind.DOCUMENT],
     roles: [UserRole.PROFESSIONAL],
