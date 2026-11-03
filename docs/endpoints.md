@@ -57,6 +57,7 @@ recurso (anti-IDOR) la valida cada servicio; ver `docs/revision-seguridad.md`.
 | `POST /api/v1/admin/users/:id/ban` | ADMIN | ACTIVE | Sí | Sí | global |
 | `POST /api/v1/admin/users/:id/change-role` | ADMIN | ACTIVE | Sí | Sí | global |
 | `POST /api/v1/admin/users/:id/message` | ADMIN | ACTIVE | Sí | Sí | global |
+| `GET /api/v1/admin/users/:id/metrics` | ADMIN | ACTIVE | — | — | global |
 | `POST /api/v1/admin/users/:id/password-reset` | ADMIN | ACTIVE | Sí | Sí | 10/min |
 | `POST /api/v1/admin/users/:id/restore` | ADMIN | ACTIVE | Sí | Sí | global |
 | `POST /api/v1/admin/users/:id/revoke-sessions` | ADMIN | ACTIVE | Sí | Sí | global |
@@ -162,6 +163,7 @@ recurso (anti-IDOR) la valida cada servicio; ver `docs/revision-seguridad.md`.
 | `DELETE /api/v1/professionals/me/media/:id` | PROFESSIONAL | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
 | `PUT /api/v1/professionals/me/media/order` | PROFESSIONAL | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
 | `PUT /api/v1/professionals/me/media/visible` | PROFESSIONAL | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
+| `GET /api/v1/professionals/me/metrics` | PROFESSIONAL | ACTIVE | — | — | global |
 | `PUT /api/v1/professionals/me/professions` | PROFESSIONAL | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
 | `PUT /api/v1/professionals/me/professions/visible` | PROFESSIONAL | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
 | `PUT /api/v1/professionals/me/service-areas` | PROFESSIONAL | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |

@@ -23,6 +23,7 @@ import { Hardening1793640021000 } from './1793640021000-Hardening';
 import { RevenuePanel1793640022000 } from './1793640022000-RevenuePanel';
 import { NewDeviceAlert1793640023000 } from './1793640023000-NewDeviceAlert';
 import { PushNotifications1793640024000 } from './1793640024000-PushNotifications';
+import { ProfessionalMetrics1793640025000 } from './1793640025000-ProfessionalMetrics';
 
 /**
  * Lista explícita (en orden) de migraciones. Se registran a mano en vez de con un glob para que
@@ -55,4 +56,5 @@ export const MIGRATIONS = [
   RevenuePanel1793640022000,
   NewDeviceAlert1793640023000,
   PushNotifications1793640024000,
+  ProfessionalMetrics1793640025000,
 ];

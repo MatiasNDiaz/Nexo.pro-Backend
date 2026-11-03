@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, In, MoreThanOrEqual } from 'typeorm';
 import { Neighborhood, NeighborhoodStatus } from '../locations/entities/neighborhood.entity';
+import { MetricsCollector, type MetricsViewer } from '../metrics/metrics-collector.service';
 import {
   ATTENTION_TIME_ZONE,
   cordobaClock,
@@ -131,9 +132,11 @@ export class CatalogService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly uploads: UploadsService,
+    private readonly metrics: MetricsCollector,
   ) {}
 
-  async search(query: CatalogQueryDto): Promise<CatalogPageDto> {
+  /** Con `viewer`, la página cuenta para las métricas de quienes aparecen (ADR 0033). */
+  async search(query: CatalogQueryDto, viewer?: MetricsViewer | null): Promise<CatalogPageDto> {
     const params: unknown[] = [];
     const param = (value: unknown) => {
       params.push(value);
@@ -186,6 +189,13 @@ export class CatalogService {
         LIMIT ${limit} OFFSET ${offset}`,
       params,
     );
+    if (viewer) {
+      this.metrics.recordSearch(
+        rows.map((r) => ({ profileId: r.id, userId: r.user_id })),
+        query.page,
+        viewer,
+      );
+    }
     return {
       data: await this.hydrate(rows),
       page: query.page,
@@ -206,7 +216,11 @@ export class CatalogService {
     return rows.length > 0;
   }
 
-  async profile(slug: string, now = new Date()): Promise<PublicProfileDto> {
+  async profile(
+    slug: string,
+    now = new Date(),
+    viewer?: MetricsViewer | null,
+  ): Promise<PublicProfileDto> {
     const rows: CatalogRow[] = await this.dataSource.query(
       `SELECT p.id, p.user_id, p.slug, u.first_name, u.last_name, p.business_name, p.bio,
               p.years_experience, p.reference_rate, p.rate_mode, p.free_quote, u.avatar_file_id,
@@ -220,6 +234,9 @@ export class CatalogService {
     );
     if (!rows[0]) {
       throw new NotFoundException({ code: 'PROFILE_NOT_FOUND', message: 'El perfil no existe.' });
+    }
+    if (viewer) {
+      this.metrics.recordProfileView({ profileId: rows[0].id, userId: rows[0].user_id }, viewer);
     }
     const [item] = await this.hydrate(rows);
     const id = rows[0].id;
