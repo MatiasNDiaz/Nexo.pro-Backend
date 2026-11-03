@@ -51,6 +51,16 @@ jobs:
       # Solo dependencias de producción: las de desarrollo no llegan a la imagen (ver docs/testing.md).
       - run: npm audit --omit=dev --audit-level=high
 
+  secrets:
+    name: Escaneo de secretos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Solo lo versionado (en la CI no existen los .env locales). Ver .gitleaks.toml.
+      - run: >-
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2
+          dir /repo --config /repo/.gitleaks.toml --redact --no-banner
+
   docker:
     name: Imagen Docker
     runs-on: ubuntu-latest

@@ -1,0 +1,26 @@
+# Actualizaciones automáticas (SEG §21): Dependabot abre un pull request por actualización y la CI
+# las prueba. Las de seguridad llegan apenas se publican; las demás, una vez por semana.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Argentina/Cordoba
+    open-pull-requests-limit: 5
+    groups:
+      # Nest, TypeORM y sus paquetes se actualizan juntos para no romper versiones cruzadas.
+      nestjs:
+        patterns: ['@nestjs/*']
+      sentry:
+        patterns: ['@sentry/*']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly

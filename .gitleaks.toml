@@ -1,0 +1,19 @@
+# Escaneo de secretos en la CI (SEG §21). Usa las reglas por defecto de gitleaks y solo excluye
+# archivos con valores de prueba públicos a propósito (sin valor fuera de los tests).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Valores de desarrollo y tests, públicos a propósito"
+paths = [
+  '''\.env\.test$''',
+  '''\.env\.development$''',
+  '''\.env\.example$''',
+  '''(^|/)test/''',
+  '''\.spec\.ts$''',
+  '''(^|/)docs/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)dist/''',
+  '''(^|/)\.uploads(-test)?/''',
+  '''package-lock\.json$''',
+]
