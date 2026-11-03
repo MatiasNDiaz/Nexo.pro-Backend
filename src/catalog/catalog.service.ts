@@ -54,11 +54,12 @@ const VISIBLE = `
                WHERE pp.professional_id = p.id AND pp.status = 'ACTIVE')
   AND EXISTS (SELECT 1 FROM professional_service_areas a WHERE a.professional_id = p.id)`;
 
-/** Suscripción vigente: una prueba vencida que la tarea todavía no marcó ya no cuenta. */
+/** Suscripción vigente: una prueba o un período vencidos que la tarea todavía no marcó no cuentan. */
 const LIVE_SUBSCRIPTION = `
   JOIN subscriptions s ON s.user_id = u.id
-   AND s.status IN ('TRIAL', 'ACTIVE', 'CANCEL_AT_PERIOD_END')
+   AND s.status IN ('TRIAL', 'ACTIVE')
    AND (s.status <> 'TRIAL' OR s.trial_ends_at > now())
+   AND (s.status <> 'ACTIVE' OR s.current_period_end > now())
   JOIN subscription_plans sp ON sp.id = s.plan_id`;
 
 /** Hora de Córdoba. */

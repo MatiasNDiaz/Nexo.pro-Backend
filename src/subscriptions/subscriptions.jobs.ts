@@ -5,12 +5,16 @@ import { DataSource } from 'typeorm';
 import { ADVISORY_LOCKS, runExclusive } from '../database/advisory-lock';
 import { MAIL_PROVIDER, type MailProvider } from '../integrations/mail/mail-provider';
 import {
+  type PeriodReminderEvent,
   SubscriptionEvents,
   SubscriptionsService,
   type TrialReminderEvent,
 } from './subscriptions.service';
 
-/** Todos los días a las 9:00 de Córdoba: vence pruebas cumplidas y manda los recordatorios. */
+/**
+ * Todos los días a las 9:00 de Córdoba: vence pruebas cumplidas y manda los recordatorios de la
+ * prueba y del período pago. Los períodos pagos los vence la tarea de pagos (cada hora).
+ */
 @Injectable()
 export class TrialsJob {
   private readonly logger = new Logger(TrialsJob.name);
@@ -29,7 +33,9 @@ export class TrialsJob {
     try {
       const outcome = await runExclusive(this.dataSource, ADVISORY_LOCKS.TRIALS, async () => ({
         expired: await this.subscriptions.expireTrials(),
-        reminded: await this.subscriptions.sendTrialReminders(),
+        reminded:
+          (await this.subscriptions.sendTrialReminders()) +
+          (await this.subscriptions.sendPeriodReminders()),
       }));
       if (outcome.ran) {
         this.logger.log(
@@ -63,6 +69,23 @@ export class SubscriptionMailListener {
       });
     } catch (error) {
       this.logger.error('No se pudo enviar el recordatorio de la prueba', error);
+    }
+  }
+
+  @OnEvent(SubscriptionEvents.PERIOD_REMINDER, { promisify: true })
+  async onPeriodReminder(event: PeriodReminderEvent): Promise<void> {
+    const date = event.periodEndsAt.toLocaleDateString('es-AR', {
+      timeZone: 'America/Argentina/Cordoba',
+    });
+    const days = event.daysLeft === 1 ? '1 día' : `${event.daysLeft} días`;
+    try {
+      await this.mail.send({
+        to: event.email,
+        subject: `Tu plan vence en ${days}`,
+        text: `Hola ${event.firstName}:\n\nTu plan está pago hasta el ${date}. Ya podés pagar el mes siguiente desde la app; los días que te quedan no se pierden. Si no lo renovás, tu perfil deja de mostrarse al vencer. No se borra nada.`,
+      });
+    } catch (error) {
+      this.logger.error('No se pudo enviar el recordatorio del vencimiento', error);
     }
   }
 }

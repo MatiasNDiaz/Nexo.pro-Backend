@@ -20,6 +20,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const SubscriptionEvents = {
   TRIAL_REMINDER: 'subscriptions.trial-reminder',
+  PERIOD_REMINDER: 'subscriptions.period-reminder',
+  /** Cambió el plan vigente: perfiles ajusta lo visible a los límites (después del commit). */
+  PLAN_CHANGED: 'subscriptions.plan-changed',
 } as const;
 
 export interface TrialReminderEvent {
@@ -27,6 +30,17 @@ export interface TrialReminderEvent {
   firstName: string;
   daysLeft: number;
   trialEndsAt: Date;
+}
+
+export interface PeriodReminderEvent {
+  email: string;
+  firstName: string;
+  daysLeft: number;
+  periodEndsAt: Date;
+}
+
+export interface PlanChangedEvent {
+  userId: string;
 }
 
 /** Recordatorio que corresponde con esos días restantes (el menor umbral alcanzado), o null. */
@@ -41,8 +55,9 @@ export function daysUntil(date: Date, now = new Date()): number {
 }
 
 /**
- * Suscripciones del profesional. En la etapa 7.2 solo hay pruebas; los pagos con Mercado Pago
- * llegan en la etapa 9. Los límites del plan se leen siempre de `subscription_plans`.
+ * Suscripciones del profesional: prueba, vencimientos y recordatorios. Los pagos (que activan,
+ * renuevan o cambian el plan) los aplica el módulo de pagos (ADR 0026). Los límites del plan se
+ * leen siempre de `subscription_plans`.
  */
 @Injectable()
 export class SubscriptionsService {
@@ -77,7 +92,7 @@ export class SubscriptionsService {
 
   /**
    * Plan vigente (prueba o pago), o null si no tiene: sin plan no puede cargar contenido ni aparece
-   * en el catálogo. Una prueba vencida que la tarea diaria todavía no marcó ya no cuenta.
+   * en el catálogo. Una prueba o un período vencidos que la tarea todavía no marcó ya no cuentan.
    */
   async livePlan(
     userId: string,
@@ -87,6 +102,12 @@ export class SubscriptionsService {
     const subscription = await this.liveSubscription(manager, userId);
     if (!subscription?.plan) return null;
     if (subscription.status === SubscriptionStatus.TRIAL && subscription.trialEndsAt! <= now) {
+      return null;
+    }
+    if (
+      subscription.status === SubscriptionStatus.ACTIVE &&
+      (!subscription.currentPeriodEnd || subscription.currentPeriodEnd <= now)
+    ) {
       return null;
     }
     return subscription.plan;
@@ -100,7 +121,15 @@ export class SubscriptionsService {
       order: { createdAt: 'DESC' },
     });
     if (!subscription?.plan) {
-      return { status: null, live: false, plan: null, trialEndsAt: null, trialDaysLeft: null };
+      return {
+        status: null,
+        live: false,
+        plan: null,
+        trialEndsAt: null,
+        trialDaysLeft: null,
+        currentPeriodEnd: null,
+        periodDaysLeft: null,
+      };
     }
     const plan = await this.livePlan(userId, this.dataSource.manager, now);
     const { plan: current } = subscription;
@@ -122,6 +151,11 @@ export class SubscriptionsService {
       trialDaysLeft:
         subscription.status === SubscriptionStatus.TRIAL && subscription.trialEndsAt
           ? daysUntil(subscription.trialEndsAt, now)
+          : null,
+      currentPeriodEnd: subscription.currentPeriodEnd,
+      periodDaysLeft:
+        subscription.status === SubscriptionStatus.ACTIVE && subscription.currentPeriodEnd
+          ? daysUntil(subscription.currentPeriodEnd, now)
           : null,
     };
   }
@@ -171,24 +205,9 @@ export class SubscriptionsService {
     for (const subscription of soon) {
       const daysLeft = daysUntil(subscription.trialEndsAt!, now);
       const reminder = trialReminderFor(daysLeft);
-      const last = subscription.lastTrialReminderDays;
-      if (reminder === null || (last !== null && last <= reminder)) continue;
-      // Condicional: si otra instancia ya lo marcó, no se manda dos veces.
-      const result = await this.dataSource
-        .getRepository(Subscription)
-        .createQueryBuilder()
-        .update()
-        .set({ lastTrialReminderDays: reminder })
-        .where('id = :id AND status = :status', {
-          id: subscription.id,
-          status: SubscriptionStatus.TRIAL,
-        })
-        .andWhere('(last_trial_reminder_days IS NULL OR last_trial_reminder_days > :reminder)', {
-          reminder,
-        })
-        .execute();
       const { user } = subscription;
-      if (!result.affected || !user || user.deletedAt) continue;
+      if (!(await this.markReminder(subscription, SubscriptionStatus.TRIAL, reminder))) continue;
+      if (!user || user.deletedAt) continue;
       const event: TrialReminderEvent = {
         email: user.email,
         firstName: user.firstName,
@@ -199,6 +218,56 @@ export class SubscriptionsService {
       sent++;
     }
     return sent;
+  }
+
+  /**
+   * Recordatorios del vencimiento del período pago a los 7, 3 y 1 días (los mismos umbrales que la
+   * prueba). Se pueden pagar el mes siguiente desde 7 días antes; al renovar se reinician.
+   */
+  async sendPeriodReminders(now = new Date()): Promise<number> {
+    const soon = await this.dataSource.getRepository(Subscription).find({
+      where: { status: SubscriptionStatus.ACTIVE, currentPeriodEnd: MoreThan(now) },
+      relations: { user: true },
+    });
+    let sent = 0;
+    for (const subscription of soon) {
+      const daysLeft = daysUntil(subscription.currentPeriodEnd!, now);
+      const reminder = trialReminderFor(daysLeft);
+      const { user } = subscription;
+      if (!(await this.markReminder(subscription, SubscriptionStatus.ACTIVE, reminder))) continue;
+      if (!user || user.deletedAt) continue;
+      const event: PeriodReminderEvent = {
+        email: user.email,
+        firstName: user.firstName,
+        daysLeft,
+        periodEndsAt: subscription.currentPeriodEnd!,
+      };
+      await this.events.emitAsync(SubscriptionEvents.PERIOD_REMINDER, event);
+      sent++;
+    }
+    return sent;
+  }
+
+  /**
+   * Marca el recordatorio si corresponde y no se mandó uno igual o más cercano. Es condicional: si
+   * otra instancia ya lo marcó, no se manda dos veces.
+   */
+  private async markReminder(
+    subscription: Subscription,
+    status: SubscriptionStatus,
+    reminder: number | null,
+  ): Promise<boolean> {
+    const last = subscription.lastReminderDays;
+    if (reminder === null || (last !== null && last <= reminder)) return false;
+    const result = await this.dataSource
+      .getRepository(Subscription)
+      .createQueryBuilder()
+      .update()
+      .set({ lastReminderDays: reminder })
+      .where('id = :id AND status = :status', { id: subscription.id, status })
+      .andWhere('(last_reminder_days IS NULL OR last_reminder_days > :reminder)', { reminder })
+      .execute();
+    return Boolean(result.affected);
   }
 
   private liveSubscription(manager: EntityManager, userId: string) {

@@ -13,13 +13,12 @@ import {
 import { User } from '../../users/entities/user.entity';
 import { SubscriptionPlan } from './subscription-plan.entity';
 
+/** Sin débito automático no hay cancelación ni deuda: prueba, pago vigente o vencida (ADR 0026). */
 export enum SubscriptionStatus {
   /** Prueba de 30 días desde el registro, con límites de Basic (ADR 0017). */
   TRIAL = 'TRIAL',
+  /** Período pago vigente. */
   ACTIVE = 'ACTIVE',
-  /** Cancelada: sigue vigente hasta el fin del período pago (FI §6.4). */
-  CANCEL_AT_PERIOD_END = 'CANCEL_AT_PERIOD_END',
-  PAST_DUE = 'PAST_DUE',
   EXPIRED = 'EXPIRED',
 }
 
@@ -27,7 +26,6 @@ export enum SubscriptionStatus {
 export const LIVE_SUBSCRIPTION_STATUSES: readonly SubscriptionStatus[] = [
   SubscriptionStatus.TRIAL,
   SubscriptionStatus.ACTIVE,
-  SubscriptionStatus.CANCEL_AT_PERIOD_END,
 ];
 
 /** Suscripción del profesional. Una sola viva por usuario (índice único parcial). */
@@ -38,10 +36,8 @@ export const LIVE_SUBSCRIPTION_STATUSES: readonly SubscriptionStatus[] = [
 @Index('uq_subscriptions_live', { synchronize: false })
 @Index('ix_subscriptions_trial_ends_at', { synchronize: false })
 @Check('ck_subscriptions_trial', "status <> 'TRIAL' OR trial_ends_at IS NOT NULL")
-@Check(
-  'ck_subscriptions_reminder',
-  'last_trial_reminder_days IS NULL OR last_trial_reminder_days IN (7, 3, 1)',
-)
+@Check('ck_subscriptions_reminder', 'last_reminder_days IS NULL OR last_reminder_days IN (7, 3, 1)')
+@Check('ck_subscriptions_amount_paid', 'period_amount_paid IS NULL OR period_amount_paid >= 0')
 export class Subscription {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -66,16 +62,23 @@ export class Subscription {
   @Column({ type: 'timestamptz', nullable: true })
   trialEndsAt: Date | null;
 
-  /** Períodos pagos (etapa 9). */
+  /**
+   * Tramo pago sin cortes (ADR 0026): desde que empezó a regir el plan pago hasta donde está pago,
+   * incluidos los meses pagados por adelantado. Vencida, queda el último tramo.
+   */
   @Column({ type: 'timestamptz', nullable: true })
   currentPeriodStart: Date | null;
 
   @Column({ type: 'timestamptz', nullable: true })
   currentPeriodEnd: Date | null;
 
-  /** Último recordatorio de fin de prueba enviado (7, 3 o 1 días): no se repite. */
+  /** Lo pagado por el último mes más las diferencias de mejora: base de la próxima diferencia. */
+  @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
+  periodAmountPaid: string | null;
+
+  /** Último recordatorio enviado (7, 3 o 1 días) del fin de la prueba o del período: no se repite. */
   @Column({ type: 'smallint', nullable: true })
-  lastTrialReminderDays: number | null;
+  lastReminderDays: number | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
@@ -83,6 +86,25 @@ export class Subscription {
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 }
+
+/** Eventos del historial (columna de texto: sumar uno no cambia la base). */
+export const SubscriptionHistoryEvent = {
+  TRIAL_STARTED: 'TRIAL_STARTED',
+  TRIAL_EXPIRED: 'TRIAL_EXPIRED',
+  /** Pago aprobado que activa el plan (desde la prueba o vencida). */
+  PAYMENT_APPROVED: 'PAYMENT_APPROVED',
+  /** Pago aprobado del mes siguiente. */
+  RENEWED: 'RENEWED',
+  /** Cambio de plan: por una diferencia pagada o al empezar un período pagado con otro plan. */
+  UPGRADED: 'UPGRADED',
+  DOWNGRADED: 'DOWNGRADED',
+  /** Terminó el período pago sin renovar. */
+  EXPIRED: 'EXPIRED',
+  /** Reembolso o contracargo: se revierte lo que dio el pago (ADR 0026). */
+  PAYMENT_REVERTED: 'PAYMENT_REVERTED',
+  /** Cambio de plan del admin, de común acuerdo (con motivo y auditoría). */
+  ADMIN_CHANGE: 'ADMIN_CHANGE',
+} as const;
 
 /** Historial de la suscripción (FI §6.4: se conserva siempre). */
 @Entity('subscription_history')
@@ -101,7 +123,7 @@ export class SubscriptionHistory {
   @JoinColumn({ name: 'subscription_id' })
   subscription?: Relation<Subscription>;
 
-  /** TRIAL_STARTED, TRIAL_EXPIRED; la etapa 9 suma los de pagos. */
+  /** Ver `SubscriptionHistoryEvent`. */
   @Column({ type: 'varchar', length: 40 })
   event: string;
 

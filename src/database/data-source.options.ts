@@ -4,6 +4,7 @@ import { AuthIdentity, OAuthPendingRequest } from '../auth/entities/auth-identit
 import { AuthSession } from '../auth/entities/auth-session.entity';
 import { Conversation, Message, MessageAttachment } from '../chat/entities/chat.entities';
 import { Notification } from '../notifications/entities/notification.entity';
+import { Payment, PaymentEvent } from '../payments/entities/payment.entity';
 import {
   Quote,
   ServiceContract,
@@ -74,6 +75,8 @@ export const ENTITIES = [
   ServiceContract,
   ServiceContractHistory,
   Notification,
+  Payment,
+  PaymentEvent,
 ];
 
 export interface ConnectionSettings {

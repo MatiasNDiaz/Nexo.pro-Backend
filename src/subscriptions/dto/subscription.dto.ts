@@ -25,4 +25,12 @@ export class SubscriptionSummaryDto {
     description: 'Contador de la prueba (ADR 0017): 30 al registrarse, 1 el último día',
   })
   trialDaysLeft: number | null;
+  @ApiProperty({
+    nullable: true,
+    type: Date,
+    description: 'Hasta cuándo está pago (incluye los meses pagados por adelantado)',
+  })
+  currentPeriodEnd: Date | null;
+  @ApiProperty({ nullable: true, type: Number, description: 'Días que quedan del período pago' })
+  periodDaysLeft: number | null;
 }
