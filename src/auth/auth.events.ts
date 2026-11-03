@@ -9,6 +9,8 @@ export const AuthEvents = {
   PASSWORD_RESET_REQUESTED: 'auth.password-reset-requested',
   PASSWORD_CHANGED: 'auth.password-changed',
   ACCOUNT_DELETION_SCHEDULED: 'account.deletion-scheduled',
+  /** Confirmar por email la vinculación con Google (ADR 0015). */
+  GOOGLE_LINK_REQUESTED: 'auth.google-link-requested',
 } as const;
 
 export interface AccountDeletionScheduledEvent {

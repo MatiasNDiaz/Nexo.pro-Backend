@@ -51,6 +51,13 @@ export class CurrentUserDto {
   }
 }
 
+/** `/auth/me`: el usuario y cómo puede entrar (ADR 0023). */
+export class MeDto extends CurrentUserDto {
+  @ApiProperty({ description: 'false en cuentas creadas con Google sin contraseña' })
+  hasPassword: boolean;
+  @ApiProperty() googleLinked: boolean;
+}
+
 /**
  * Respuesta del login. El `csrfToken` NO es un secreto de autenticación: solo prueba que la
  * request viene de nuestro frontend (ver docs/auth.md). Los tokens de sesión van solo en cookies.

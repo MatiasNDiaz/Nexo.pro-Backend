@@ -1,4 +1,5 @@
 import { EntityManager } from 'typeorm';
+import { AuthIdentity, OAuthPendingRequest } from '../auth/entities/auth-identity.entity';
 import { AuthSession, SessionRevokeReason } from '../auth/entities/auth-session.entity';
 import { OneTimeToken } from '../auth/entities/one-time-token.entity';
 import { UserMfaSettings } from '../auth/entities/user-mfa-settings.entity';
@@ -39,6 +40,9 @@ export async function anonymizeAccount(manager: EntityManager, userId: string): 
   });
   await manager.getRepository(UserMfaSettings).delete({ userId });
   await manager.getRepository(OneTimeToken).delete({ userId });
+  // La vinculación con Google identifica a la persona (ADR 0015).
+  await manager.getRepository(AuthIdentity).delete({ userId });
+  await manager.getRepository(OAuthPendingRequest).delete({ userId });
   await manager
     .createQueryBuilder()
     .update(ProfessionalProfile)

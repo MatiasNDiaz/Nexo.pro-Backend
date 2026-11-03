@@ -11,6 +11,7 @@ import {
   alreadyRegisteredMail,
   emailVerificationMail,
   FRONTEND_PATHS,
+  googleLinkMail,
   passwordChangedMail,
   passwordResetMail,
 } from './auth-mail.templates';
@@ -63,6 +64,12 @@ export class AuthMailListener {
     return this.send(
       accountDeletionScheduledMail(event.email, event.firstName, event.deletionScheduledFor),
     );
+  }
+
+  @OnEvent(AuthEvents.GOOGLE_LINK_REQUESTED, { promisify: true })
+  onGoogleLink(event: TokenMailEvent): Promise<void> {
+    const link = this.link(FRONTEND_PATHS.linkGoogle, event.token);
+    return this.send(googleLinkMail(event.email, event.firstName, link));
   }
 
   private link(path: string, token: string): string {

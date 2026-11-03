@@ -22,6 +22,7 @@ import { databaseConfig } from './config/database.config';
 import { validateEnv } from './config/env.validation';
 import { mailConfig } from './config/mail.config';
 import { securityConfig } from './config/security.config';
+import { googleConfig } from './config/google.config';
 import { identityConfig, storageConfig } from './config/storage.config';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
@@ -51,6 +52,7 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
         mailConfig,
         storageConfig,
         identityConfig,
+        googleConfig,
       ],
       // Falla al iniciar si el entorno es inválido. Devuelve las variables crudas para que
       // @nestjs/config las copie a process.env (solo copia strings/números/booleanos, no listas);

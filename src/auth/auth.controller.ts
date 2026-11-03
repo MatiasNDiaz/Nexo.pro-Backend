@@ -28,26 +28,25 @@ import {
 import {
   CsrfTokenDto,
   CurrentUserDto,
+  MeDto,
   MessageDto,
   MfaRequiredDto,
   SessionResponseDto,
   SessionSummaryDto,
 } from './dto/auth-responses.dto';
 import { RegisterDto } from './dto/register.dto';
+import { SetPasswordDto } from './google/google-auth.dto';
+import { GoogleAuthService } from './google/google-auth.service';
 import { SessionRevokeReason } from './entities/auth-session.entity';
 import { requestMeta, type RequestMeta } from './request-meta';
 import { AuthCookiesService } from './services/auth-cookies.service';
 import { AuthService } from './services/auth.service';
 import { CsrfService } from './services/csrf.service';
 import { REGISTER_MESSAGE, RegistrationService } from './services/registration.service';
-import {
-  type ActiveFamily,
-  type IssuedSession,
-  SessionsService,
-} from './services/sessions.service';
+import { type ActiveFamily, SessionsService } from './services/sessions.service';
+import { SessionResponderService } from './services/session-responder.service';
 import { TokenService } from './services/token.service';
 import { UploadsService } from '../uploads/uploads.service';
-import type { User } from '../users/entities/user.entity';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -69,6 +68,8 @@ export class AuthController {
     private readonly cookies: AuthCookiesService,
     private readonly csrf: CsrfService,
     private readonly uploads: UploadsService,
+    private readonly responder: SessionResponderService,
+    private readonly google: GoogleAuthService,
     @Inject(securityConfig.KEY) private readonly security: SecurityConfig,
   ) {}
 
@@ -97,7 +98,7 @@ export class AuthController {
       this.cookies.set(res, 'mfa', challenge, 5 * 60);
       return { mfaRequired: true };
     }
-    return this.establishSession(res, result.user, result.issued);
+    return this.responder.respond(res, result.user, result.issued);
   }
 
   @Public()
@@ -119,7 +120,7 @@ export class AuthController {
     const result = await this.auth.verifyMfa(userId, dto, this.meta(req));
     this.cookies.clear(res, 'mfa');
     if (result.kind !== 'SESSION') throw new UnauthorizedException();
-    return this.establishSession(res, result.user, result.issued);
+    return this.responder.respond(res, result.user, result.issued);
   }
 
   /**
@@ -197,10 +198,13 @@ export class AuthController {
   @Get('me')
   @AllowAccountStates(...ANY_SIGNED_IN_STATE)
   @ApiCookieAuth()
-  @ApiOkResponse({ type: CurrentUserDto })
-  async me(@CurrentUser() user: AuthUser): Promise<CurrentUserDto> {
+  @ApiOkResponse({ type: MeDto })
+  async me(@CurrentUser() user: AuthUser): Promise<MeDto> {
     const current = await this.auth.currentUser(user);
-    return CurrentUserDto.from(current, await this.uploads.avatarUrls(current));
+    return {
+      ...CurrentUserDto.from(current, await this.uploads.avatarUrls(current)),
+      ...(await this.google.accessMethods(current.id)),
+    };
   }
 
   /**
@@ -290,25 +294,15 @@ export class AuthController {
     return this.auth.changePassword(user, dto.currentPassword, dto.newPassword);
   }
 
-  private async establishSession(
-    res: Response,
-    user: User,
-    issued: IssuedSession,
-  ): Promise<SessionResponseDto> {
-    const access = await this.tokens.signAccessToken(user, issued.session.id);
-    const csrfCookie = this.csrf.newCookieValue();
-    this.cookies.set(res, 'access', access, this.tokens.accessTtlFor(user.role));
-    this.cookies.set(
-      res,
-      'refresh',
-      issued.refreshToken,
-      this.secondsUntil(issued.session.expiresAt),
-    );
-    this.cookies.set(res, 'csrf', csrfCookie, this.secondsUntil(issued.session.familyExpiresAt));
-    return {
-      user: CurrentUserDto.from(user, await this.uploads.avatarUrls(user)),
-      csrfToken: this.csrf.tokenFor(issued.session.familyId, csrfCookie),
-    };
+  /** Cuentas solo Google: crear la primera contraseña, con un login reciente (ADR 0023). */
+  @Post('password/set')
+  @HttpCode(204)
+  @AllowAccountStates('PENDING_VERIFICATION', 'ACTIVE')
+  @Throttle({ default: { limit: 5, ttl: MINUTE } })
+  @ApiCookieAuth()
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  setPassword(@CurrentUser() user: AuthUser, @Body() dto: SetPasswordDto): Promise<void> {
+    return this.auth.setPassword(user, dto.newPassword);
   }
 
   /** Token CSRF de la familia; si la cookie se perdió, emite una nueva con la vida de la familia. */

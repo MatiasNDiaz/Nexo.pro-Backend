@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataSource, EntityManager, IsNull, MoreThan } from 'typeorm';
 import { AUDIT_LOGGER, type AuditLogger } from '../../audit/audit-logger';
@@ -10,6 +10,9 @@ import { AccountStatus, UserRole } from '../../users/user.enums';
 import { AuthSession, SessionRevokeReason } from '../entities/auth-session.entity';
 import { RequestMeta } from '../request-meta';
 import { TokenService } from './token.service';
+
+/** Ventana de un inicio de sesión reciente (ADR 0023). */
+export const RECENT_LOGIN_MS = 10 * 60 * 1000;
 
 export interface IssuedSession {
   session: AuthSession;
@@ -208,6 +211,20 @@ export class SessionsService {
       })
       .execute();
     if (!result.affected) throw new NotFoundException();
+  }
+
+  /**
+   * Exige que el dispositivo haya iniciado sesión hace menos de 10 minutos (ADR 0023): con una
+   * sesión vieja robada no se puede crear contraseña ni dar de baja una cuenta sin contraseña.
+   */
+  async assertRecentLogin(user: AuthUser, now = new Date()): Promise<void> {
+    const startedAt = (await this.familyStartDates([user.familyId])).get(user.familyId);
+    if (!startedAt || now.getTime() - new Date(startedAt).getTime() > RECENT_LOGIN_MS) {
+      throw new ForbiddenException({
+        code: 'REAUTH_REQUIRED',
+        message: 'Por seguridad, volvé a iniciar sesión y repetí la acción.',
+      });
+    }
   }
 
   private ttl(role: UserRole) {

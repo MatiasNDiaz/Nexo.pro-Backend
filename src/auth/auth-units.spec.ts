@@ -113,6 +113,8 @@ describe('cookies en producción (ADR 0008)', () => {
       refresh: '__Secure-nx_rt',
       csrf: '__Host-nx_csrf',
       mfa: '__Secure-nx_mfa',
+      oauth: '__Secure-nx_oauth',
+      oauthPending: '__Secure-nx_oauth_pending',
     });
     expect(buildCookieNames(false).access).toBe('nx_at');
   });

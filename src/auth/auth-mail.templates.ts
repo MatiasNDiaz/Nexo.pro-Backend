@@ -8,6 +8,9 @@ import type { MailMessage } from '../integrations/mail/mail-provider';
 export const FRONTEND_PATHS = {
   verifyEmail: '/verificar-email',
   resetPassword: '/restablecer-contrasena',
+  linkGoogle: '/vincular-google',
+  /** Adonde vuelve el navegador después de Google, con `?resultado=` (ver docs/auth.md). */
+  googleResult: '/ingresar/google',
 } as const;
 
 const SIGNATURE = '\n\nSi no fuiste vos, ignorá este mensaje o escribinos a soporte.';
@@ -56,5 +59,13 @@ export function passwordChangedMail(to: string, firstName: string): MailMessage 
     to,
     subject: 'Tu contraseña cambió',
     text: `Hola ${firstName}:\n\nLa contraseña de tu cuenta se cambió recién.${SIGNATURE}`,
+  };
+}
+
+export function googleLinkMail(to: string, firstName: string, link: string): MailMessage {
+  return {
+    to,
+    subject: 'Confirmá que querés entrar con Google',
+    text: `Hola ${firstName}:\n\nPidieron vincular una cuenta de Google a tu cuenta. Si fuiste vos, confirmalo en este enlace (vence en 30 minutos):\n${link}${SIGNATURE}`,
   };
 }

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -79,6 +80,19 @@ export class AuthService {
       return { kind: 'MFA_REQUIRED', userId: user.id };
     }
     return { kind: 'SESSION', user, issued: await this.startSession(user, meta) };
+  }
+
+  /**
+   * Verifica la contraseña de una cuenta con el mismo bloqueo progresivo que el login (vincular
+   * Google con contraseña, ADR 0015). Una cuenta sin contraseña nunca la verifica.
+   */
+  async verifyPasswordFor(userId: string, password: string): Promise<boolean> {
+    const user = await this.findWithPassword({ id: userId });
+    if (!user) return this.passwords.verifyDummy(password);
+    const ok = await this.passwords.verify(user.passwordHash, password);
+    if (this.isLocked(user)) return false;
+    if (!ok) await this.registerFailedAttempt(user.id);
+    return ok;
   }
 
   /** Segundo paso del admin. Los códigos fallidos suman al mismo bloqueo progresivo. */
@@ -199,6 +213,12 @@ export class AuthService {
   /** Cambio con la contraseña actual: cierra los demás dispositivos y conserva el actual. */
   async changePassword(authUser: AuthUser, current: string, next: string): Promise<void> {
     const user = await this.findWithPassword({ id: authUser.id });
+    if (user && user.passwordHash === null) {
+      throw new ConflictException({
+        code: 'NO_PASSWORD_SET',
+        message: 'Tu cuenta todavía no tiene contraseña: creala primero.',
+      });
+    }
     if (!user || !(await this.passwords.verify(user.passwordHash, current))) {
       throw new BadRequestException({
         code: 'INVALID_CURRENT_PASSWORD',
@@ -227,7 +247,40 @@ export class AuthService {
     await this.emitUserMail(AuthEvents.PASSWORD_CHANGED, user);
   }
 
-  private async startSession(user: User, meta: RequestMeta): Promise<IssuedSession> {
+  /**
+   * Crea la contraseña de una cuenta que entró solo con Google (ADR 0023): exige un inicio de
+   * sesión reciente y conserva el dispositivo actual.
+   */
+  async setPassword(authUser: AuthUser, next: string): Promise<void> {
+    const user = await this.findWithPassword({ id: authUser.id });
+    if (!user) throw new NotFoundException();
+    if (user.passwordHash !== null) {
+      throw new ConflictException({
+        code: 'PASSWORD_ALREADY_SET',
+        message: 'Tu cuenta ya tiene contraseña: usá el cambio de contraseña.',
+      });
+    }
+    await this.sessions.assertRecentLogin(authUser);
+    this.passwords.assertAcceptable(next, user);
+    await this.dataSource.transaction(async (manager) => {
+      await this.updatePassword(manager, user.id, next);
+      await this.audit.record(
+        {
+          actorId: user.id,
+          action: 'PASSWORD_SET',
+          targetType: 'USER',
+          targetId: user.id,
+          reason: null,
+          result: 'SUCCESS',
+        },
+        manager,
+      );
+    });
+    await this.emitUserMail(AuthEvents.PASSWORD_CHANGED, user);
+  }
+
+  /** Abre un dispositivo nuevo y limpia el bloqueo por intentos (también lo usa el login con Google). */
+  async startSession(user: User, meta: RequestMeta): Promise<IssuedSession> {
     return this.dataSource.transaction(async (manager) => {
       await manager.getRepository(User).update(user.id, {
         failedLoginAttempts: 0,

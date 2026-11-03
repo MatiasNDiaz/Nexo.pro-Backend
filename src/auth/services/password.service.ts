@@ -29,7 +29,9 @@ export class PasswordService implements OnModuleInit {
   }
 
   /** Nunca lanza: un hash corrupto cuenta como contraseña incorrecta. */
-  async verify(hash: string, plain: string): Promise<boolean> {
+  /** Sin hash (cuenta solo Google, ADR 0023): mismo costo que una verificación real y false. */
+  async verify(hash: string | null, plain: string): Promise<boolean> {
+    if (hash === null) return this.verifyDummy(plain);
     try {
       return await argon2.verify(hash, plain);
     } catch {

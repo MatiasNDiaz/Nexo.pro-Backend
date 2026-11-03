@@ -17,6 +17,9 @@ import { PasswordService } from './password.service';
 export const REGISTER_MESSAGE =
   'Si los datos son válidos, te enviamos un email para confirmar tu cuenta.';
 
+/** Datos de una cuenta nueva, sin la contraseña (con Google no hay). */
+export type AccountData = Omit<RegisterDto, 'password'>;
+
 type Outcome = { kind: 'CREATED'; user: User; token: string } | { kind: 'EXISTS' };
 
 const isUniqueEmailViolation = (error: unknown) =>
@@ -66,6 +69,16 @@ export class RegistrationService {
     await this.events.emitAsync(AuthEvents.EMAIL_VERIFICATION_REQUESTED, event);
   }
 
+  /**
+   * Alta de una cuenta con el email ya verificado por Google (ADR 0015): mismos datos obligatorios y
+   * misma verificación de identidad que el registro normal, sin contraseña. Corre en la transacción
+   * del llamador.
+   */
+  async createGoogleAccount(manager: EntityManager, data: AccountData): Promise<User> {
+    this.assertRoleFields(data);
+    return this.insertAccount(manager, data, null, 'GOOGLE');
+  }
+
   private async createAccount(
     manager: EntityManager,
     dto: RegisterDto,
@@ -73,7 +86,23 @@ export class RegistrationService {
   ): Promise<Outcome> {
     const users = manager.getRepository(User);
     if (await users.existsBy({ email: dto.email })) return { kind: 'EXISTS' };
+    const user = await this.insertAccount(manager, dto, passwordHash, 'PASSWORD');
+    const token = await this.oneTimeTokens.issue(
+      user.id,
+      OneTimeTokenType.EMAIL_VERIFY,
+      this.config.ttlSec.emailVerification,
+      manager,
+    );
+    return { kind: 'CREATED', user, token };
+  }
 
+  private async insertAccount(
+    manager: EntityManager,
+    dto: AccountData,
+    passwordHash: string | null,
+    via: 'PASSWORD' | 'GOOGLE',
+  ): Promise<User> {
+    const users = manager.getRepository(User);
     const createdNeighborhoods: string[] = [];
     let neighborhoodId: string | null = null;
     if (dto.role === UserRole.CUSTOMER && dto.neighborhood) {
@@ -95,6 +124,8 @@ export class RegistrationService {
       lastName: dto.lastName,
       phone: dto.phone,
       neighborhoodId,
+      // Google ya verificó el email (solo se aceptan emails verificados por Google).
+      emailVerifiedAt: via === 'GOOGLE' ? new Date() : null,
     });
     await users.insert(user);
 
@@ -111,12 +142,6 @@ export class RegistrationService {
     for (const id of createdNeighborhoods)
       await this.neighborhoods.setCreator(manager, id, user.id);
 
-    const token = await this.oneTimeTokens.issue(
-      user.id,
-      OneTimeTokenType.EMAIL_VERIFY,
-      this.config.ttlSec.emailVerification,
-      manager,
-    );
     await this.audit.record(
       {
         actorId: user.id,
@@ -125,15 +150,15 @@ export class RegistrationService {
         targetId: user.id,
         reason: null,
         result: 'SUCCESS',
-        metadata: { role: user.role, newNeighborhoods: createdNeighborhoods.length },
+        metadata: { role: user.role, newNeighborhoods: createdNeighborhoods.length, via },
       },
       manager,
     );
-    return { kind: 'CREATED', user, token };
+    return user;
   }
 
   /** Cada rol manda solo sus datos: nada de mezclar barrio de cliente con zonas de profesional. */
-  private assertRoleFields(dto: RegisterDto): void {
+  private assertRoleFields(dto: AccountData): void {
     const isCustomer = dto.role === UserRole.CUSTOMER;
     const misplaced = isCustomer
       ? dto.professionId !== undefined || dto.serviceAreas !== undefined

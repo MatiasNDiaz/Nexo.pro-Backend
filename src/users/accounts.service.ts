@@ -190,8 +190,11 @@ export class AccountsService {
     return purged;
   }
 
-  /** Baja de la propia cuenta: exige la contraseña. El admin no puede darse de baja así. */
-  async deleteOwn(authUser: AuthUser, password: string): Promise<void> {
+  /**
+   * Baja de la propia cuenta: exige la contraseña; una cuenta solo Google, un inicio de sesión
+   * reciente (ADR 0023). El admin no puede darse de baja así.
+   */
+  async deleteOwn(authUser: AuthUser, password: string | undefined): Promise<void> {
     if (authUser.role === UserRole.ADMIN) {
       throw new ForbiddenException({
         code: 'ADMIN_CANNOT_SELF_DELETE',
@@ -204,7 +207,9 @@ export class AccountsService {
       .addSelect('u.passwordHash')
       .where('u.id = :id', { id: authUser.id })
       .getOneOrFail();
-    if (!(await this.passwords.verify(withPassword.passwordHash, password))) {
+    if (withPassword.passwordHash === null) {
+      await this.sessions.assertRecentLogin(authUser);
+    } else if (!(await this.passwords.verify(withPassword.passwordHash, password ?? ''))) {
       throw new BadRequestException({
         code: 'INVALID_CURRENT_PASSWORD',
         message: 'La contraseña no es correcta.',

@@ -57,12 +57,16 @@ export class ChangeRoleDto extends AccountActionDto {
   serviceAreas?: ServiceAreaInputDto[];
 }
 
-/** Baja de la propia cuenta: exige la contraseña (reautenticación, SEG §13.3). */
+/**
+ * Baja de la propia cuenta: exige la contraseña (reautenticación, SEG §13.3). Una cuenta sin
+ * contraseña (solo Google) la omite y necesita un inicio de sesión reciente (ADR 0023).
+ */
 export class DeleteOwnAccountDto {
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
   @MaxLength(128)
-  password: string;
+  password?: string;
 }
 
 export class AccountSummaryDto {

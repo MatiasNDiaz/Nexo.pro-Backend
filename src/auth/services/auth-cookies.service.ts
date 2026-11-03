@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { CookieOptions, Request, Response } from 'express';
 import { type AuthConfig, authConfig } from '../../config/auth.config';
 
-type CookieKind = 'access' | 'refresh' | 'csrf' | 'mfa';
+type CookieKind = 'access' | 'refresh' | 'csrf' | 'mfa' | 'oauth' | 'oauthPending';
 
 /**
  * Único lugar que escribe y borra cookies de autenticación. Atributos: HttpOnly, SameSite=Lax,
