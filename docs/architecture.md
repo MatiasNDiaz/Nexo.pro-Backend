@@ -16,7 +16,8 @@ Monolito modular NestJS (plan §5–7). Controllers delgados, reglas de negocio 
 | 7B Login con Google         | Hecha: OpenID Connect con PKCE (adaptador simulado hasta tener credenciales), vinculación con contraseña o email, registro con Google, cuentas sin contraseña                                            |
 | 8 Chat y contrataciones     | Hecha: chat con adjuntos privados, solicitudes a varios profesionales, presupuestos, contrataciones con transiciones, notificaciones internas y tiempo real (Socket.IO)                                  |
 | 9 Pagos                     | Hecha (en revisión): checkout manual de Mercado Pago (adaptador simulado), webhook firmado e idempotente, control de coincidencia, reversión por reembolso, cambios de plan y vencimientos               |
-| 10–13                       | Pendientes (ver `docs/roadmap.md`)                                                                                                                                                                       |
+| 10 Reputación y comunidad   | Hecha (en revisión): reseñas con respuesta del profesional, favoritos con avisos, foro con respuestas anidadas y "me gusta", opiniones de la plataforma; chat sin plan con contratación en curso         |
+| 11–13                       | Pendientes (ver `docs/roadmap.md`)                                                                                                                                                                       |
 
 ## Estructura actual
 
@@ -60,6 +61,9 @@ src/
 ├── notifications/          # notificaciones internas
 ├── realtime/               # gateway y adaptador de Socket.IO (avisos)
 ├── catalog/                # catálogo público: búsqueda, orden y página del profesional
+├── reviews/                # reseñas, respuesta del profesional y opiniones de la plataforma
+├── favorites/              # favoritos y avisos de disponibilidad
+├── forum/                  # publicaciones, respuestas anidadas, "me gusta" y moderación
 ├── uploads/                # stored_files, tickets de subida, confirmación, foto de perfil, limpieza
 ├── identity-verification/  # intentos, webhook del proveedor, cola y decisiones del admin
 ├── audit/                  # AuditService (puerto AUDIT_LOGGER), global
