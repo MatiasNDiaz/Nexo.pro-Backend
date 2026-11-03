@@ -28,3 +28,5 @@ mostrar la cara de otra persona con la insignia de identidad verificada.
   revisión de una foto nueva.
 - Antes de la primera aprobación (cuenta `PENDING_VERIFICATION`) la foto se cambia libremente, como en
   la etapa 7.1.
+
+**Actualización (ADR 0021).** La revisión ahora se llama `PROFILE_CHANGE` y cubre también el cambio de nombre: una sola revisión abierta por persona; aprobarla aplica todo lo pendiente y rechazarla lo descarta.

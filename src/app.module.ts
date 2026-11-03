@@ -7,6 +7,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { CatalogModule } from './catalog/catalog.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { AccountStateGuard } from './common/guards/account-state.guard';
 import { CsrfGuard } from './common/guards/csrf.guard';
@@ -87,6 +88,7 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
     IdentityVerificationModule,
     SubscriptionsModule,
     ProfessionalsModule,
+    CatalogModule,
   ],
   providers: [
     // Guards globales, en este orden (plan §9.8). Denegación por defecto: solo `@Public()` pasa

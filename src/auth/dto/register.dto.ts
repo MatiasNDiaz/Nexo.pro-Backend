@@ -20,15 +20,16 @@ import { NEIGHBORHOOD_NAME_MAX, NEIGHBORHOOD_NAME_MIN } from '../../locations/ne
 import { SELF_REGISTRABLE_ROLES, UserRole } from '../../users/user.enums';
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../services/password.service';
 
-const trim = ({ value }: { value: unknown }) =>
+export const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value;
 const lowerTrim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim().toLowerCase() : value;
 /** Teléfono: se descartan espacios, guiones y paréntesis antes de validar. */
-const phoneDigits = ({ value }: { value: unknown }) =>
+export const phoneDigits = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.replace(/[\s()-]/g, '') : value;
 
-const PERSON_NAME = /^\p{L}[\p{L} '.-]*$/u;
+export const PERSON_NAME = /^\p{L}[\p{L} '.-]*$/u;
+export const PHONE_PATTERN = /^\+?\d{8,15}$/;
 
 export class NeighborhoodInputDto {
   @ApiProperty({ format: 'uuid' })
@@ -93,7 +94,7 @@ export class RegisterDto {
   @ApiProperty({ example: '+5493511234567' })
   @Transform(phoneDigits)
   @IsString()
-  @Matches(/^\+?\d{8,15}$/)
+  @Matches(PHONE_PATTERN)
   phone: string;
 
   @ApiPropertyOptional({ type: NeighborhoodInputDto, description: 'Obligatorio para clientes' })

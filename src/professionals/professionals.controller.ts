@@ -22,6 +22,7 @@ import {
   AddAvailabilityExceptionDto,
   AddCertificationDto,
   AddMediaDto,
+  AdminUpdateProfessionalProfileDto,
   AttentionStatusDto,
   CertificationItemDto,
   HideContentDto,
@@ -189,7 +190,22 @@ export class ProfessionalsController {
 @Roles('ADMIN')
 @Controller({ path: 'admin/professionals', version: '1' })
 export class AdminProfessionalContentController {
-  constructor(private readonly moderation: ContentModerationService) {}
+  constructor(
+    private readonly moderation: ContentModerationService,
+    private readonly profiles: ProfileService,
+  ) {}
+
+  /** Edita los datos del perfil de un profesional (ADR 0021), con motivo y auditoría. */
+  @Patch(':userId/profile')
+  @ApiOkResponse({ type: ProfessionalMeDto })
+  updateProfile(
+    @CurrentUser() admin: AuthUser,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() dto: AdminUpdateProfessionalProfileDto,
+  ): Promise<ProfessionalMeDto> {
+    const { reason, ...changes } = dto;
+    return this.profiles.update(userId, changes, { adminId: admin.id, reason });
+  }
 
   @Post('media/:id/hide')
   @HttpCode(204)

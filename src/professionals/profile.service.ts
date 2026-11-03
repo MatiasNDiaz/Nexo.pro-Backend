@@ -2,10 +2,12 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, EntityManager, In, IsNull, MoreThanOrEqual, Not } from 'typeorm';
+import { AUDIT_LOGGER, type AuditLogger } from '../audit/audit-logger';
 import type { ApiErrorDetail } from '../common/errors/api-error';
 import { NeighborhoodsService } from '../locations/neighborhoods.service';
 import { Profession } from '../professions/entities/profession.entity';
@@ -69,6 +71,7 @@ export class ProfileService {
     private readonly neighborhoods: NeighborhoodsService,
     private readonly subscriptions: SubscriptionsService,
     private readonly uploads: UploadsService,
+    @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
   ) {}
 
   async me(userId: string, now = new Date()): Promise<ProfessionalMeDto> {
@@ -162,7 +165,12 @@ export class ProfileService {
     };
   }
 
-  async update(userId: string, dto: UpdateProfessionalProfileDto): Promise<ProfessionalMeDto> {
+  /** Datos del perfil. El admin también puede editarlos, con motivo y auditoría (ADR 0021). */
+  async update(
+    userId: string,
+    dto: UpdateProfessionalProfileDto,
+    byAdmin?: { adminId: string; reason: string },
+  ): Promise<ProfessionalMeDto> {
     await this.dataSource.transaction(async (manager) => {
       const profile = await this.ownProfile(manager, userId, true);
       const referenceRate =
@@ -191,6 +199,23 @@ export class ProfileService {
         referenceRate,
         rateMode,
       });
+      if (byAdmin) {
+        const fields = Object.keys(dto).filter(
+          (key) => dto[key as keyof UpdateProfessionalProfileDto] !== undefined,
+        );
+        await this.audit.record(
+          {
+            actorId: byAdmin.adminId,
+            action: 'PROFESSIONAL_PROFILE_UPDATED',
+            targetType: 'USER',
+            targetId: userId,
+            reason: byAdmin.reason,
+            result: 'SUCCESS',
+            metadata: { fields: fields.join(',') },
+          },
+          manager,
+        );
+      }
     });
     return this.me(userId);
   }

@@ -1,9 +1,20 @@
-import { Body, Controller, Delete, HttpCode, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { ApiCookieAuth, ApiHeader, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { type AuthUser, CurrentUser, Roles } from '../common/decorators';
 import { AccountsService } from './accounts.service';
 import { AccountActionDto, AccountSummaryDto, ChangeRoleDto } from './dto/account-admin.dto';
+import { AdminUpdatePersonalDataDto, PersonalDataDto } from './dto/personal-data.dto';
 import type { User } from './entities/user.entity';
+import { PersonalDataService } from './personal-data.service';
 
 const summary = (user: User): AccountSummaryDto => ({
   id: user.id,
@@ -21,7 +32,21 @@ const summary = (user: User): AccountSummaryDto => ({
 @Roles('ADMIN')
 @Controller({ path: 'admin/users', version: '1' })
 export class AdminUsersController {
-  constructor(private readonly accounts: AccountsService) {}
+  constructor(
+    private readonly accounts: AccountsService,
+    private readonly personalData: PersonalDataService,
+  ) {}
+
+  /** Edita datos de un cliente o profesional (ADR 0021): se aplican directo, con motivo. */
+  @Patch(':id')
+  @ApiOkResponse({ type: PersonalDataDto })
+  updateData(
+    @CurrentUser() admin: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AdminUpdatePersonalDataDto,
+  ): Promise<PersonalDataDto> {
+    return this.personalData.updateByAdmin(admin, id, dto);
+  }
 
   @Post(':id/suspend')
   @HttpCode(200)

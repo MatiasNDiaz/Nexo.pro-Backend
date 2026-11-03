@@ -12,7 +12,8 @@ Monolito modular NestJS (plan §5–7). Controllers delgados, reglas de negocio 
 | 6. Autorización y estados   | Hecha: suspensión, baneo, restauración, cambio de rol, revocación de sesiones y baja con anonimización (admin y propia); test que recorre todas las rutas                                                |
 | 7.1 Archivos e identidad    | Hecha: archivos (Cloudinary/local) y foto de perfil, verificación de identidad (módulo de referencia), moderación de barrios, tareas programadas                                                         |
 | 7.2 Perfiles y planes       | Hecha: perfil de cliente y profesional, medios, certificados, redes, horarios, personalización, prueba de 30 días con recordatorios, cambio de foto en revisión                                          |
-| 7.3–13                      | Pendientes (ver `docs/roadmap.md`, incluye la etapa 7B de login con Google)                                                                                                                              |
+| 7.3 Catálogo                | Hecha: catálogo público con filtros y orden (ADR 0022), página pública por slug, edición de datos personales (ADR 0021)                                                                                  |
+| 7B y 8–13                   | Pendientes (ver `docs/roadmap.md`, incluye la etapa 7B de login con Google)                                                                                                                              |
 
 ## Estructura actual
 
@@ -48,6 +49,7 @@ src/
 ├── integrations/mail/      # MailProvider + adaptadores consola/memoria
 ├── integrations/storage/   # StorageProvider + Cloudinary / disco local, detección de tipo real
 ├── integrations/identity/  # IdentityVerificationProvider + manual / simulado (fake)
+├── catalog/                # catálogo público: búsqueda, orden y página del profesional
 ├── uploads/                # stored_files, tickets de subida, confirmación, foto de perfil, limpieza
 ├── identity-verification/  # intentos, webhook del proveedor, cola y decisiones del admin
 ├── audit/                  # AuditService (puerto AUDIT_LOGGER), global
@@ -155,3 +157,14 @@ Detalle de cada guard en `docs/authorization.md`. El de suscripción/plan llega 
   revisión es un intento `AVATAR_CHANGE` y "identidad aprobada" incluye ese caso (`isIdentityApproved`).
 - **Módulos sin ciclos:** `subscriptions` no importa a nadie del dominio; `uploads` usa
   `subscriptions`; `professionals` usa `uploads` y `subscriptions`.
+
+**Etapa 7.3**
+
+- **Visibilidad calculada en cada consulta** (sin `is_listed`): una sola condición SQL (`VISIBLE` en
+  `catalog.service.ts`) con cuenta, identidad, prueba o plan vigente y perfil completo.
+- **Estado de atención en SQL** para filtrar "Disponible ya" y ordenar; es la misma regla que
+  `effectiveAttentionStatus` y un test e2e compara los dos resultados.
+- **Lo que excede el plan actual no se muestra** en la página pública (tema, banner, cantidad de
+  medios), sin borrar nada: al volver a subir de plan reaparece.
+- **Email y teléfono solo en el detalle**, con un límite de 30 consultas por minuto por IP (C-19).
+- **Revisión de datos única** (`PROFILE_CHANGE`): foto y nombre pendientes se aprueban o rechazan juntos.

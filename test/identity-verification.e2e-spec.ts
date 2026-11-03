@@ -286,7 +286,7 @@ describe('Verificación de identidad (e2e, proveedor simulado)', () => {
     const openReview = (userId: string) =>
       dataSource.getRepository(IdentityVerification).findOneByOrFail({
         userId,
-        kind: VerificationKind.AVATAR_CHANGE,
+        kind: VerificationKind.PROFILE_CHANGE,
         status: VerificationStatus.REQUIRES_REVIEW,
       });
 
@@ -311,7 +311,7 @@ describe('Verificación de identidad (e2e, proveedor simulado)', () => {
       expect(
         await dataSource
           .getRepository(IdentityVerification)
-          .countBy({ userId: id, kind: VerificationKind.AVATAR_CHANGE }),
+          .countBy({ userId: id, kind: VerificationKind.PROFILE_CHANGE }),
       ).toBe(1);
 
       const list = await admin.get('/admin/identity-verifications?status=REQUIRES_REVIEW&limit=50');
@@ -319,7 +319,7 @@ describe('Verificación de identidad (e2e, proveedor simulado)', () => {
       expect(
         (list.body.data as Array<{ id: string }>).find((v) => v.id === review.id),
       ).toMatchObject({
-        kind: 'AVATAR_CHANGE',
+        kind: 'PROFILE_CHANGE',
         subject: { avatarUrl: avatar.url, pendingAvatarUrl: again.url },
       });
     });
@@ -374,7 +374,7 @@ describe('Verificación de identidad (e2e, proveedor simulado)', () => {
       expect(
         await dataSource.getRepository(IdentityVerification).countBy({
           userId: id,
-          kind: VerificationKind.AVATAR_CHANGE,
+          kind: VerificationKind.PROFILE_CHANGE,
           status: VerificationStatus.REQUIRES_REVIEW,
         }),
       ).toBe(0);

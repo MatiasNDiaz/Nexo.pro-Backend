@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, HttpCode, Put, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Patch, Put, Res } from '@nestjs/common';
 import { ApiCookieAuth, ApiHeader, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
@@ -9,6 +9,8 @@ import { IdentityVerificationService } from '../identity-verification/identity-v
 import { SetAvatarDto } from '../uploads/dto/uploads.dto';
 import { AccountsService } from './accounts.service';
 import { DeleteOwnAccountDto } from './dto/account-admin.dto';
+import { PersonalDataDto, UpdatePersonalDataDto } from './dto/personal-data.dto';
+import { PersonalDataService } from './personal-data.service';
 
 @ApiTags('users')
 @ApiCookieAuth()
@@ -17,8 +19,34 @@ export class UsersController {
   constructor(
     private readonly accounts: AccountsService,
     private readonly identity: IdentityVerificationService,
+    private readonly personalData: PersonalDataService,
     private readonly cookies: AuthCookiesService,
   ) {}
+
+  @Get('me')
+  @Roles('CUSTOMER', 'PROFESSIONAL')
+  @AllowAccountStates('PENDING_VERIFICATION', 'ACTIVE')
+  @ApiOkResponse({ type: PersonalDataDto })
+  personal(@CurrentUser() user: AuthUser): Promise<PersonalDataDto> {
+    return this.personalData.get(user.id);
+  }
+
+  /**
+   * Datos personales (ADR 0021). Teléfono y barrio: inmediato. Nombre y apellido con la identidad
+   * aprobada: quedan en revisión del admin y en público se ve el anterior (
+ameUnderReview).
+   */
+  @Patch('me')
+  @Roles('CUSTOMER', 'PROFESSIONAL')
+  @AllowAccountStates('PENDING_VERIFICATION', 'ACTIVE')
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiOkResponse({ type: PersonalDataDto })
+  updatePersonal(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdatePersonalDataDto,
+  ): Promise<PersonalDataDto & { nameUnderReview: boolean }> {
+    return this.personalData.updateOwn(user, dto);
+  }
 
   /**
    * Foto de perfil (paso 2 del registro, ADR 0006): un archivo AVATAR propio ya confirmado.

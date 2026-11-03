@@ -281,6 +281,15 @@ export class AddAvailabilityExceptionDto {
   note?: string;
 }
 
+/** El admin edita el perfil de un profesional (ADR 0021): mismos campos, más el motivo. */
+export class AdminUpdateProfessionalProfileDto extends UpdateProfessionalProfileDto {
+  @ApiProperty({ minLength: 10, maxLength: 500 })
+  @Transform(trim)
+  @IsString()
+  @Length(10, 500)
+  reason: string;
+}
+
 export class HideContentDto {
   @ApiProperty({ minLength: 5, maxLength: 300, description: 'Motivo (auditado)' })
   @Transform(trim)

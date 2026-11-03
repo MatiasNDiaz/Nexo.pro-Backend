@@ -15,6 +15,9 @@ const PUBLIC_ROUTES = new Set([
   'GET /api/v1/locations/localities',
   'GET /api/v1/locations/neighborhoods',
   'GET /api/v1/professions',
+  // Catálogo público (etapa 7.3).
+  'GET /api/v1/catalog/professionals',
+  'GET /api/v1/catalog/professionals/:slug',
   'POST /api/v1/auth/register',
   'POST /api/v1/auth/login',
   'POST /api/v1/auth/mfa/verify',

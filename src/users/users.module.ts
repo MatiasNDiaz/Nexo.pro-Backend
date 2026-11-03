@@ -8,6 +8,7 @@ import { AccountsPurgeJob } from './accounts-purge.job';
 import { AccountsService } from './accounts.service';
 import { AdminUsersController } from './admin-users.controller';
 import { CustomersController } from './customers.controller';
+import { PersonalDataService } from './personal-data.service';
 import { UsersController } from './users.controller';
 
 @Module({
@@ -19,7 +20,7 @@ import { UsersController } from './users.controller';
     IdentityVerificationModule,
   ],
   controllers: [UsersController, AdminUsersController, CustomersController],
-  providers: [AccountsService, AccountsPurgeJob],
+  providers: [AccountsService, AccountsPurgeJob, PersonalDataService],
   exports: [AccountsService],
 })
 export class UsersModule {}

@@ -81,7 +81,7 @@ export class VerificationResponseDto {
   @ApiProperty({
     enum: VerificationKind,
     nullable: true,
-    description: 'IDENTITY o AVATAR_CHANGE (revisión de una foto nueva, ADR 0019)',
+    description: 'IDENTITY o PROFILE_CHANGE (revisión de foto o nombre nuevos, ADR 0019 y 0021)',
   })
   kind: VerificationKind | null;
   @ApiProperty({ enum: VerificationStatus }) status: VerificationStatus;
@@ -124,6 +124,9 @@ export class VerificationSubjectDto {
   @ApiProperty() email: string;
   @ApiProperty() phone: string;
   @ApiProperty({ nullable: true, type: String }) avatarUrl: string | null;
+  @ApiProperty({ nullable: true, type: String, description: 'Nombre nuevo en revisión (ADR 0021)' })
+  pendingFirstName: string | null;
+  @ApiProperty({ nullable: true, type: String }) pendingLastName: string | null;
   @ApiProperty({ nullable: true, type: String, description: 'Foto nueva en revisión (ADR 0019)' })
   pendingAvatarUrl: string | null;
 }

@@ -245,8 +245,8 @@ export class IdentityVerificationService {
         });
       }
       const subject = await manager.getRepository(User).findOneByOrFail({ id: current.userId });
-      const avatarReview = current.kind === VerificationKind.AVATAR_CHANGE;
-      if (target === VerificationStatus.APPROVED && !avatarReview) {
+      const profileReview = current.kind === VerificationKind.PROFILE_CHANGE;
+      if (target === VerificationStatus.APPROVED && !profileReview) {
         // ADR 0006: solo se aprueba con el perfil completo.
         this.assertProfileComplete(subject);
       }
@@ -259,20 +259,20 @@ export class IdentityVerificationService {
       current.adminNote = dto.adminNote ?? current.adminNote;
       const saved = await manager.getRepository(IdentityVerification).save(current);
 
-      if (avatarReview) {
-        // ADR 0019: aprobar reemplaza la foto; rechazar conserva la anterior. La identidad sigue
-        // aprobada en los dos casos.
-        discarded = await this.resolveAvatarReview(
+      if (profileReview) {
+        // ADR 0019 y 0021: aprobar aplica la foto y el nombre pendientes; rechazar los descarta.
+        // La identidad sigue aprobada en los dos casos.
+        discarded = await this.resolveProfileReview(
           manager,
           subject,
           target === VerificationStatus.APPROVED,
         );
         await this.applyVerificationStatus(manager, current.userId, VerificationStatus.APPROVED);
       } else {
-        if (target === VerificationStatus.REVOKED && subject.pendingAvatarFileId) {
-          // Revocar la identidad cierra también la revisión de foto abierta.
-          discarded = await this.resolveAvatarReview(manager, subject, false);
-          await this.closeOpenAvatarReview(manager, admin, subject.id);
+        if (target === VerificationStatus.REVOKED && hasPendingChanges(subject)) {
+          // Revocar la identidad cierra también la revisión de datos abierta.
+          discarded = await this.resolveProfileReview(manager, subject, false);
+          await this.closeOpenProfileReview(manager, admin.id, subject.id, 'IDENTITY_REVOKED');
         }
         await this.applyVerificationStatus(manager, current.userId, target);
       }
@@ -323,32 +323,7 @@ export class IdentityVerificationService {
         subject.pendingAvatarFileId ? [subject.pendingAvatarFileId] : [],
       );
       await manager.getRepository(User).update(subject.id, { pendingAvatarFileId: file.id });
-      const open = await manager.getRepository(IdentityVerification).findOneBy({
-        userId: subject.id,
-        kind: VerificationKind.AVATAR_CHANGE,
-        status: VerificationStatus.REQUIRES_REVIEW,
-      });
-      if (!open) {
-        const repository = manager.getRepository(IdentityVerification);
-        await repository.insert(
-          repository.create({
-            id: randomUUID(),
-            userId: subject.id,
-            kind: VerificationKind.AVATAR_CHANGE,
-            status: VerificationStatus.REQUIRES_REVIEW,
-            provider: 'MANUAL',
-            providerReference: null,
-            attemptNumber: await this.nextAttemptNumber(manager, subject.id),
-            decisionSource: null,
-            reasonCode: null,
-            adminNote: null,
-            decidedBy: null,
-            submittedAt: new Date(),
-            decidedAt: null,
-          }),
-        );
-        await this.applyVerificationStatus(manager, subject.id, VerificationStatus.REQUIRES_REVIEW);
-      }
+      await this.openProfileReview(manager, subject.id);
       return { file, underReview: true };
     });
     await this.uploads.deleteFromStorage(discarded);
@@ -377,39 +352,140 @@ export class IdentityVerificationService {
     };
   }
 
+  /**
+   * Cambio de nombre (ADR 0021), en la transacción del llamador con el usuario bloqueado. Con la
+   * identidad aprobada queda pendiente en la revisión de datos; si no, se aplica directamente.
+   * Devuelve true si quedó en revisión.
+   */
+  async proposeNameChange(
+    manager: EntityManager,
+    subject: User,
+    firstName: string,
+    lastName: string,
+  ): Promise<boolean> {
+    const users = manager.getRepository(User);
+    if (!isIdentityApproved(subject)) {
+      await users.update(subject.id, { firstName, lastName });
+      return false;
+    }
+    if (subject.firstName === firstName && subject.lastName === lastName) {
+      // Vuelve al nombre aprobado: no hay nada que revisar.
+      await users.update(subject.id, { pendingFirstName: null, pendingLastName: null });
+      if (!subject.pendingAvatarFileId) await this.closeIfNothingPending(manager, subject.id);
+      return false;
+    }
+    await users.update(subject.id, { pendingFirstName: firstName, pendingLastName: lastName });
+    await this.openProfileReview(manager, subject.id);
+    return true;
+  }
+
+  /**
+   * El admin cambia el nombre directamente (ADR 0021): reemplaza el nombre pendiente y, si ya no
+   * queda nada por revisar, cierra la revisión.
+   */
+  async applyNameByAdmin(
+    manager: EntityManager,
+    adminId: string,
+    subject: User,
+    firstName: string,
+    lastName: string,
+  ): Promise<void> {
+    await manager
+      .getRepository(User)
+      .update(subject.id, { firstName, lastName, pendingFirstName: null, pendingLastName: null });
+    if (subject.pendingFirstName && !subject.pendingAvatarFileId) {
+      await this.closeOpenProfileReview(manager, adminId, subject.id, 'SUPERSEDED_BY_ADMIN');
+      await this.applyVerificationStatus(manager, subject.id, VerificationStatus.APPROVED);
+    }
+  }
+
   // ---------------------------------------------------------------------------------------------
 
-  /** Cierra la revisión de foto: aprobada, la nueva reemplaza a la actual; rechazada, se descarta. */
-  private async resolveAvatarReview(
+  /** Abre la revisión de datos (foto y nombre) si no hay una abierta. */
+  private async openProfileReview(manager: EntityManager, userId: string): Promise<void> {
+    const repository = manager.getRepository(IdentityVerification);
+    const open = await repository.findOneBy({
+      userId,
+      kind: VerificationKind.PROFILE_CHANGE,
+      status: VerificationStatus.REQUIRES_REVIEW,
+    });
+    if (open) return;
+    await repository.insert(
+      repository.create({
+        id: randomUUID(),
+        userId,
+        kind: VerificationKind.PROFILE_CHANGE,
+        status: VerificationStatus.REQUIRES_REVIEW,
+        provider: 'MANUAL',
+        providerReference: null,
+        attemptNumber: await this.nextAttemptNumber(manager, userId),
+        decisionSource: null,
+        reasonCode: null,
+        adminNote: null,
+        decidedBy: null,
+        submittedAt: new Date(),
+        decidedAt: null,
+      }),
+    );
+    await this.applyVerificationStatus(manager, userId, VerificationStatus.REQUIRES_REVIEW);
+  }
+
+  /** El usuario retiró lo último que había pendiente: la revisión se cierra sin decisión. */
+  private async closeIfNothingPending(manager: EntityManager, userId: string): Promise<void> {
+    const result = await manager.getRepository(IdentityVerification).update(
+      {
+        userId,
+        kind: VerificationKind.PROFILE_CHANGE,
+        status: VerificationStatus.REQUIRES_REVIEW,
+      },
+      { status: VerificationStatus.REJECTED, decidedAt: new Date(), reasonCode: 'WITHDRAWN' },
+    );
+    if (result.affected) {
+      await this.applyVerificationStatus(manager, userId, VerificationStatus.APPROVED);
+    }
+  }
+
+  /**
+   * Cierra la revisión de datos: aprobada, la foto y el nombre pendientes reemplazan a los actuales;
+   * rechazada, se descartan.
+   */
+  private async resolveProfileReview(
     manager: EntityManager,
     subject: User,
     approve: boolean,
   ): Promise<StoredFile[]> {
-    const pending = subject.pendingAvatarFileId;
-    if (!pending) return [];
-    if (!approve) {
-      await manager.getRepository(User).update(subject.id, { pendingAvatarFileId: null });
-      return this.uploads.markDeleted(manager, [pending]);
-    }
-    await manager
-      .getRepository(User)
-      .update(subject.id, { avatarFileId: pending, pendingAvatarFileId: null });
+    const users = manager.getRepository(User);
+    const pendingAvatar = subject.pendingAvatarFileId;
+    const pendingName =
+      subject.pendingFirstName && subject.pendingLastName
+        ? { firstName: subject.pendingFirstName, lastName: subject.pendingLastName }
+        : null;
+    await users.update(subject.id, {
+      pendingAvatarFileId: null,
+      pendingFirstName: null,
+      pendingLastName: null,
+      ...(approve && pendingAvatar && { avatarFileId: pendingAvatar }),
+      ...(approve && pendingName),
+    });
+    if (!pendingAvatar) return [];
+    if (!approve) return this.uploads.markDeleted(manager, [pendingAvatar]);
     return this.uploads.markDeleted(manager, subject.avatarFileId ? [subject.avatarFileId] : []);
   }
 
-  private async closeOpenAvatarReview(
+  private async closeOpenProfileReview(
     manager: EntityManager,
-    admin: AuthUser,
+    adminId: string,
     userId: string,
+    reasonCode: string,
   ): Promise<void> {
     await manager.getRepository(IdentityVerification).update(
-      { userId, kind: VerificationKind.AVATAR_CHANGE, status: VerificationStatus.REQUIRES_REVIEW },
+      { userId, kind: VerificationKind.PROFILE_CHANGE, status: VerificationStatus.REQUIRES_REVIEW },
       {
         status: VerificationStatus.REJECTED,
         decisionSource: DecisionSource.ADMIN,
-        decidedBy: admin.id,
+        decidedBy: adminId,
         decidedAt: new Date(),
-        reasonCode: 'IDENTITY_REVOKED',
+        reasonCode,
       },
     );
   }
@@ -421,6 +497,7 @@ export class IdentityVerificationService {
     );
     return (rows[0]?.last ?? 0) + 1;
   }
+
   /** Requisitos para verificar la identidad (ADR 0006): email verificado y foto de perfil. */
   private assertProfileComplete(user: User): void {
     const missing: ApiErrorDetail[] = [];
@@ -457,6 +534,8 @@ export class IdentityVerificationService {
         email: u.email,
         phone: u.phone,
         avatarUrl: u.avatarFileId ? (avatars.get(u.avatarFileId) ?? null) : null,
+        pendingFirstName: u.pendingFirstName,
+        pendingLastName: u.pendingLastName,
         pendingAvatarUrl: u.pendingAvatarFileId
           ? (avatars.get(u.pendingAvatarFileId) ?? null)
           : null,
@@ -559,4 +638,8 @@ export class IdentityVerificationService {
       (error.driverError as { code?: string } | undefined)?.code === PG_UNIQUE_VIOLATION
     );
   }
+}
+
+function hasPendingChanges(user: User): boolean {
+  return user.pendingAvatarFileId !== null || user.pendingFirstName !== null;
 }
