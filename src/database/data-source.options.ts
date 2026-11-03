@@ -5,6 +5,16 @@ import { AuthSession } from '../auth/entities/auth-session.entity';
 import { Conversation, Message, MessageAttachment } from '../chat/entities/chat.entities';
 import { Notification } from '../notifications/entities/notification.entity';
 import { Payment, PaymentEvent } from '../payments/entities/payment.entity';
+import { Favorite } from '../favorites/entities/favorite.entity';
+import {
+  ForumPost,
+  ForumPostLike,
+  ForumPostMedia,
+  ForumPostProfession,
+  ForumReply,
+  ForumReplyLike,
+} from '../forum/entities/forum.entities';
+import { PlatformReview, Review } from '../reviews/entities/review.entity';
 import {
   Quote,
   ServiceContract,
@@ -77,6 +87,15 @@ export const ENTITIES = [
   Notification,
   Payment,
   PaymentEvent,
+  Review,
+  PlatformReview,
+  Favorite,
+  ForumPost,
+  ForumPostProfession,
+  ForumPostMedia,
+  ForumReply,
+  ForumPostLike,
+  ForumReplyLike,
 ];
 
 export interface ConnectionSettings {

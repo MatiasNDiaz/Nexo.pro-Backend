@@ -76,6 +76,15 @@ export const FILE_POLICIES: Record<FilePurpose, FilePolicy> = {
     // Pesos de Basic (ADR 0024).
     maxBytes: (kind) => (kind === FileKind.VIDEO ? 30 * MB : 5 * MB),
   },
+  [FilePurpose.FORUM_MEDIA]: {
+    kinds: [FileKind.IMAGE, FileKind.VIDEO],
+    roles: [UserRole.CUSTOMER, UserRole.PROFESSIONAL],
+    visibility: FileVisibility.PUBLIC,
+    folder: 'forum',
+    // El foro exige plan a los profesionales al publicar (ADR 0028); los clientes no tienen plan.
+    needsPlan: false,
+    maxBytes: (kind) => (kind === FileKind.VIDEO ? 30 * MB : 5 * MB),
+  },
   [FilePurpose.CERTIFICATE]: {
     kinds: [FileKind.IMAGE, FileKind.DOCUMENT],
     roles: [UserRole.PROFESSIONAL],

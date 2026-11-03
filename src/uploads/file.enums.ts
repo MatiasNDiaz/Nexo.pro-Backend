@@ -7,6 +7,8 @@ export enum FilePurpose {
   CERTIFICATE = 'CERTIFICATE',
   /** Adjuntos del chat (ADR 0024): privados, solo para los dos participantes. */
   CHAT_ATTACHMENT = 'CHAT_ATTACHMENT',
+  /** Fotos y video de las publicaciones del foro (ADR 0028): públicos. */
+  FORUM_MEDIA = 'FORUM_MEDIA',
 }
 
 export enum FileKind {

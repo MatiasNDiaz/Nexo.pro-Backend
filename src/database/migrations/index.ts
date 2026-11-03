@@ -17,6 +17,7 @@ import { PendingNameChange1793640015000 } from './1793640015000-PendingNameChang
 import { GoogleLogin1793640016000 } from './1793640016000-GoogleLogin';
 import { ChatRequestsContracts1793640017000 } from './1793640017000-ChatRequestsContracts';
 import { Payments1793640018000 } from './1793640018000-Payments';
+import { ReviewsFavoritesForum1793640019000 } from './1793640019000-ReviewsFavoritesForum';
 
 /**
  * Lista explícita (en orden) de migraciones. Se registran a mano en vez de con un glob para que
@@ -43,4 +44,5 @@ export const MIGRATIONS = [
   GoogleLogin1793640016000,
   ChatRequestsContracts1793640017000,
   Payments1793640018000,
+  ReviewsFavoritesForum1793640019000,
 ];
