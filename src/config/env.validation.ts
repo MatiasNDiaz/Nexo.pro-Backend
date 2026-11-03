@@ -28,6 +28,9 @@ export type IdentityProviderName = (typeof IDENTITY_PROVIDERS)[number];
 export const PAYMENTS_PROVIDERS = ['disabled', 'mercadopago', 'fake'] as const;
 export type PaymentsProviderName = (typeof PAYMENTS_PROVIDERS)[number];
 
+export const PUSH_PROVIDERS = ['disabled', 'webpush', 'fake'] as const;
+export type PushProviderName = (typeof PUSH_PROVIDERS)[number];
+
 export const MAIL_PROVIDERS = ['console', 'memory'] as const;
 export type MailProviderName = (typeof MAIL_PROVIDERS)[number];
 
@@ -335,6 +338,27 @@ export class EnvironmentVariables {
   @MinLength(32)
   CLOUDFLARE_EDGE_SECRET?: string;
 
+  // ---- Notificaciones push (etapa 13.3, ADR 0032) ----
+
+  /** `disabled` (sin push), `webpush` (con claves VAPID) o `fake` (tests: prohibido en producción). */
+  @IsIn(PUSH_PROVIDERS)
+  PUSH_PROVIDER: PushProviderName = 'disabled';
+
+  /** Clave pública VAPID (`npm run push:keys`). La usa el navegador para suscribirse. */
+  @IsOptional()
+  @Matches(/^[A-Za-z0-9_-]{87}$/)
+  VAPID_PUBLIC_KEY?: string;
+
+  /** Clave privada VAPID. **Secreta**: cambiarla invalida todas las suscripciones. */
+  @IsOptional()
+  @Matches(/^[A-Za-z0-9_-]{43}$/)
+  VAPID_PRIVATE_KEY?: string;
+
+  /** Contacto para los servicios de push: `mailto:` o una URL https. */
+  @IsOptional()
+  @Matches(/^(mailto:[^\s@]+@[^\s@]+|https:\/\/\S+)$/)
+  VAPID_SUBJECT?: string;
+
   // ---- Monitoreo (etapa 12) ----
 
   /** DSN de Sentry. Sin él, el reporte de errores queda apagado. */
@@ -383,6 +407,11 @@ function providerRules(env: EnvironmentVariables): string[] {
   if (env.PAYMENTS_PROVIDER === 'mercadopago' && !env.MERCADOPAGO_ACCESS_TOKEN) {
     problems.push('MERCADOPAGO_ACCESS_TOKEN (obligatoria con PAYMENTS_PROVIDER=mercadopago)');
   }
+  if (env.PUSH_PROVIDER === 'webpush') {
+    for (const name of ['VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_SUBJECT'] as const) {
+      if (!env[name]) problems.push(`${name} (obligatoria con PUSH_PROVIDER=webpush)`);
+    }
+  }
   if (env.PAYMENTS_PROVIDER !== 'disabled') {
     for (const name of ['MERCADOPAGO_WEBHOOK_SECRET', 'API_PUBLIC_URL'] as const) {
       if (!env[name]) problems.push(`${name} (obligatoria con los pagos activados)`);
@@ -410,6 +439,9 @@ function productionRules(env: EnvironmentVariables): string[] {
   }
   if (env.PAYMENTS_PROVIDER === 'fake') {
     problems.push('PAYMENTS_PROVIDER (los pagos simulados están prohibidos en producción)');
+  }
+  if (env.PUSH_PROVIDER === 'fake') {
+    problems.push('PUSH_PROVIDER (el push simulado está prohibido en producción)');
   }
   if (env.API_PUBLIC_URL && !env.API_PUBLIC_URL.startsWith('https://')) {
     problems.push('API_PUBLIC_URL (en producción debe ser https)');

@@ -26,6 +26,12 @@ const ANY_ROLE = [
   'POST /api/v1/notifications/:id/read',
   'POST /api/v1/notifications/read-all',
   'GET /api/v1/notifications/unread-count',
+  // Push y preferencias (ADR 0032): el admin también recibe sus alertas por push.
+  'GET /api/v1/notifications/push/key',
+  'POST /api/v1/notifications/push/subscriptions',
+  'POST /api/v1/notifications/push/subscriptions/remove',
+  'GET /api/v1/notifications/preferences',
+  'PUT /api/v1/notifications/preferences',
   // El servicio rechaza al admin (no se da de baja desde la API).
   'DELETE /api/v1/users/me',
 ];

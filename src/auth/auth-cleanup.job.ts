@@ -14,6 +14,7 @@ export interface CleanupResult {
   sessions: number;
   oneTimeTokens: number;
   oauthPending: number;
+  pushSubscriptions: number;
 }
 
 /**
@@ -41,7 +42,16 @@ export async function purgeExpiredAuthData(
     `DELETE FROM oauth_pending_requests WHERE expires_at < $1`,
     [daysAgo(CLEANUP_RETENTION.oauthPendingDays)],
   );
-  return { sessions, oneTimeTokens, oauthPending };
+  // Push de dispositivos sin sesión abierta (ADR 0032): ya no reciben avisos.
+  const [, pushSubscriptions]: [unknown, number] = await dataSource.query(
+    `DELETE FROM push_subscriptions ps
+      WHERE NOT EXISTS (
+        SELECT 1 FROM auth_sessions s
+         WHERE s.family_id = ps.family_id AND s.user_id = ps.user_id AND s.revoked_at IS NULL
+           AND s.expires_at > $1 AND s.family_expires_at > $1)`,
+    [now],
+  );
+  return { sessions, oneTimeTokens, oauthPending, pushSubscriptions };
 }
 
 /** Todos los días a las 4:00 de Córdoba (poca actividad). */
@@ -62,9 +72,9 @@ export class AuthCleanupJob {
         purgeExpiredAuthData(this.dataSource),
       );
       if (outcome.ran) {
-        const { sessions, oneTimeTokens, oauthPending } = outcome.result;
+        const { sessions, oneTimeTokens, oauthPending, pushSubscriptions } = outcome.result;
         this.logger.log(
-          `Limpieza: ${sessions} sesiones, ${oneTimeTokens} enlaces, ${oauthPending} pedidos de Google`,
+          `Limpieza: ${sessions} sesiones, ${oneTimeTokens} enlaces, ${oauthPending} pedidos de Google, ${pushSubscriptions} suscripciones push`,
         );
       }
     } catch (error) {

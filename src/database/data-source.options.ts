@@ -4,6 +4,7 @@ import { AuthIdentity, OAuthPendingRequest } from '../auth/entities/auth-identit
 import { AuthSession } from '../auth/entities/auth-session.entity';
 import { Conversation, Message, MessageAttachment } from '../chat/entities/chat.entities';
 import { Notification } from '../notifications/entities/notification.entity';
+import { NotificationPreference, PushSubscription } from '../notifications/entities/push.entities';
 import { Payment, PaymentEvent } from '../payments/entities/payment.entity';
 import { Favorite } from '../favorites/entities/favorite.entity';
 import {
@@ -93,6 +94,8 @@ export const ENTITIES = [
   ServiceContract,
   ServiceContractHistory,
   Notification,
+  PushSubscription,
+  NotificationPreference,
   Payment,
   PaymentEvent,
   Review,

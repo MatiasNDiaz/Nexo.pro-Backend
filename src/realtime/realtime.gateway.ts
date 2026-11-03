@@ -81,6 +81,12 @@ export class RealtimeGateway
     // Socket.IO saca al socket de sus salas solo.
   }
 
+  /** ¿Tiene la app abierta en algún dispositivo? Entonces no hace falta el push (ADR 0032). */
+  async isOnline(userId: string): Promise<boolean> {
+    if (!this.server) return false;
+    return (await this.server.in(userRoom(userId)).fetchSockets()).length > 0;
+  }
+
   /** Avisa a todas las conexiones de ese usuario. */
   emitToUser(userId: string, event: string, payload: unknown): void {
     this.server?.to(userRoom(userId)).emit(event, payload);

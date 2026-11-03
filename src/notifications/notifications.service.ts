@@ -8,6 +8,7 @@ import {
   type NotificationTarget,
   type NotificationType,
 } from './entities/notification.entity';
+import { PushService } from './push.service';
 
 export interface NotificationInput {
   userId: string;
@@ -49,6 +50,7 @@ export class NotificationsService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly realtime: RealtimeGateway,
+    private readonly push: PushService,
   ) {}
 
   async create(manager: EntityManager, input: NotificationInput): Promise<Notification> {
@@ -85,9 +87,10 @@ export class NotificationsService {
     return created;
   }
 
-  /** Avisa por tiempo real (después del commit). */
+  /** Avisa por tiempo real y por push (después del commit, ADR 0032). */
   deliver(notifications: Notification[]): void {
     for (const n of notifications) this.realtime.emitToUser(n.userId, 'notification:new', toDto(n));
+    this.push.send(notifications);
   }
 
   /** ¿Ya hay una notificación sin leer de ese tipo para ese objeto? (evita una por mensaje). */

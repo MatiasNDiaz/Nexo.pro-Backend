@@ -18,6 +18,8 @@ import { AdminPanelModule } from './admin/admin-panel.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { AbuseModule } from './integrations/abuse/abuse.module';
 import { GeoModule } from './integrations/geo/geo.module';
+import { PushProviderModule } from './integrations/push/push-provider.module';
+import { pushConfig } from './config/push.config';
 import { abuseConfig } from './config/abuse.config';
 import { ModerationModule } from './moderation/moderation.module';
 import { SupportModule } from './support/support.module';
@@ -71,6 +73,7 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
         googleConfig,
         paymentsConfig,
         abuseConfig,
+        pushConfig,
       ],
       // Falla al iniciar si el entorno es inválido. Devuelve las variables crudas para que
       // @nestjs/config las copie a process.env (solo copia strings/números/booleanos, no listas);
@@ -101,6 +104,7 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
     MonitoringModule,
     AbuseModule,
     GeoModule,
+    PushProviderModule,
     MailModule,
     HealthModule,
     LocationsModule,

@@ -29,7 +29,8 @@
     "seed:catalogs": "npm run build && node dist/database/seeds/run-catalog-seed.js",
     "admin:create": "npm run build && node dist/auth/cli/create-admin.js",
     "admin:reset-mfa": "npm run build && node dist/auth/cli/reset-admin-mfa.js",
-    "accounts:purge": "npm run build && node dist/users/cli/purge-deleted-accounts.js"
+    "accounts:purge": "npm run build && node dist/users/cli/purge-deleted-accounts.js",
+    "push:keys": "web-push generate-vapid-keys --json"
   },
   "dependencies": {
     "@nestjs/common": "12.3.2",
@@ -64,7 +65,8 @@
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "socket.io": "4.8.4",
-    "typeorm": "1.1.2"
+    "typeorm": "1.1.2",
+    "web-push": "3.6.7"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

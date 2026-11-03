@@ -139,6 +139,11 @@ recurso (anti-IDOR) la valida cada servicio; ver `docs/revision-seguridad.md`.
 | `GET /api/v1/moderation/me` | CUSTOMER, PROFESSIONAL | PENDING_VERIFICATION, ACTIVE, SUSPENDED, BANNED | — | — | global |
 | `GET /api/v1/notifications` | Cualquier rol | PENDING_VERIFICATION, ACTIVE | — | — | global |
 | `POST /api/v1/notifications/:id/read` | Cualquier rol | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
+| `GET /api/v1/notifications/preferences` | Cualquier rol | PENDING_VERIFICATION, ACTIVE | — | — | global |
+| `PUT /api/v1/notifications/preferences` | Cualquier rol | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
+| `GET /api/v1/notifications/push/key` | Cualquier rol | PENDING_VERIFICATION, ACTIVE | — | — | global |
+| `POST /api/v1/notifications/push/subscriptions` | Cualquier rol | PENDING_VERIFICATION, ACTIVE | Sí | Sí | 10/min |
+| `POST /api/v1/notifications/push/subscriptions/remove` | Cualquier rol | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
 | `POST /api/v1/notifications/read-all` | Cualquier rol | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
 | `GET /api/v1/notifications/unread-count` | Cualquier rol | PENDING_VERIFICATION, ACTIVE | — | — | global |
 | `GET /api/v1/platform-reviews` | Público | — | — | — | global |

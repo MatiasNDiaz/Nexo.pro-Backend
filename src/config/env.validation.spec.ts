@@ -179,6 +179,10 @@ describe('validateEnv', () => {
         }),
       ).toThrow(/PAYMENTS_PROVIDER.*API_PUBLIC_URL/s);
     });
+
+    it('prohíbe el push simulado', () => {
+      expect(() => validateEnv({ ...prod, PUSH_PROVIDER: 'fake' })).toThrow(/PUSH_PROVIDER/);
+    });
   });
 
   describe('archivos e identidad', () => {
@@ -239,6 +243,26 @@ describe('validateEnv', () => {
           API_PUBLIC_URL: 'http://localhost:3001',
         }).PAYMENTS_PROVIDER,
       ).toBe('fake');
+    });
+
+    it('push: apagado por defecto; con web-push exige las tres variables VAPID válidas', () => {
+      expect(validateEnv(base).PUSH_PROVIDER).toBe('disabled');
+      expect(() => validateEnv({ ...base, PUSH_PROVIDER: 'webpush' })).toThrow(
+        /VAPID_PUBLIC_KEY.*VAPID_PRIVATE_KEY.*VAPID_SUBJECT/s,
+      );
+      const vapid = {
+        PUSH_PROVIDER: 'webpush',
+        VAPID_PUBLIC_KEY: 'B'.repeat(87),
+        VAPID_PRIVATE_KEY: 'p'.repeat(43),
+        VAPID_SUBJECT: 'mailto:soporte@example.com',
+      };
+      expect(validateEnv({ ...base, ...vapid }).PUSH_PROVIDER).toBe('webpush');
+      expect(() => validateEnv({ ...base, ...vapid, VAPID_SUBJECT: 'soporte' })).toThrow(
+        /VAPID_SUBJECT/,
+      );
+      expect(() => validateEnv({ ...base, ...vapid, VAPID_PRIVATE_KEY: 'corta' })).toThrow(
+        /VAPID_PRIVATE_KEY/,
+      );
     });
 
     it('el proveedor simulado exige su secreto de webhooks', () => {
