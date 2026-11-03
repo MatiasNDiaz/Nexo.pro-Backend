@@ -46,6 +46,8 @@ const PUBLIC_ROUTES = new Set([
   'GET /api/v1/platform-reviews',
   'GET /api/v1/forum/posts',
   'GET /api/v1/forum/posts/:id',
+  // Formulario de contacto público (ADR 0029): 3 por hora por IP.
+  'POST /api/v1/support/contact',
 ]);
 
 interface RouteLayer {
