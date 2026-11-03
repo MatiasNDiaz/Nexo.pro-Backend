@@ -11,7 +11,13 @@ import {
 import { ApiCookieAuth, ApiHeader, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { type AuthUser, CurrentUser, Roles } from '../common/decorators';
 import { AccountsService } from './accounts.service';
-import { AccountActionDto, AccountSummaryDto, ChangeRoleDto } from './dto/account-admin.dto';
+import {
+  AccountActionDto,
+  AccountSummaryDto,
+  BanAccountDto,
+  ChangeRoleDto,
+  SuspendAccountDto,
+} from './dto/account-admin.dto';
 import { AdminUpdatePersonalDataDto, PersonalDataDto } from './dto/personal-data.dto';
 import type { User } from './entities/user.entity';
 import { PersonalDataService } from './personal-data.service';
@@ -54,9 +60,14 @@ export class AdminUsersController {
   async suspend(
     @CurrentUser() admin: AuthUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: AccountActionDto,
+    @Body() dto: SuspendAccountDto,
   ): Promise<AccountSummaryDto> {
-    return summary(await this.accounts.suspend(admin, id, dto.reason));
+    return summary(
+      await this.accounts.suspend(admin, id, dto.reason, {
+        endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
+        reportId: dto.reportId ?? null,
+      }),
+    );
   }
 
   @Post(':id/ban')
@@ -65,9 +76,9 @@ export class AdminUsersController {
   async ban(
     @CurrentUser() admin: AuthUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: AccountActionDto,
+    @Body() dto: BanAccountDto,
   ): Promise<AccountSummaryDto> {
-    return summary(await this.accounts.ban(admin, id, dto.reason));
+    return summary(await this.accounts.ban(admin, id, dto.reason, { reportId: dto.reportId }));
   }
 
   @Post(':id/restore')

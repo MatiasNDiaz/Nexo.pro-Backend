@@ -26,6 +26,18 @@ export enum NotificationType {
   FORUM_REPLY = 'FORUM_REPLY',
   /** Un favorito se puso "Disponible" (planes con avisos). */
   PROFESSIONAL_AVAILABLE = 'PROFESSIONAL_AVAILABLE',
+  /** ADR 0029: al denunciante, cuando se revisó su reporte. */
+  REPORT_RESOLVED = 'REPORT_RESOLVED',
+  /** Al denunciado, solo cuando el admin marca el reporte como válido (sin decir quién fue). */
+  REPORT_UPHELD = 'REPORT_UPHELD',
+  /** Strike, advertencia o perfil oculto. */
+  MODERATION_ACTION = 'MODERATION_ACTION',
+  APPEAL_DECIDED = 'APPEAL_DECIDED',
+  /** Al admin: señales de alerta, apelaciones y consultas nuevas. */
+  MODERATION_ALERT = 'MODERATION_ALERT',
+  SUPPORT_REPLY = 'SUPPORT_REPLY',
+  ANNOUNCEMENT = 'ANNOUNCEMENT',
+  ADMIN_MESSAGE = 'ADMIN_MESSAGE',
 }
 
 export enum NotificationTarget {
@@ -38,6 +50,14 @@ export enum NotificationTarget {
   FORUM_POST = 'FORUM_POST',
   /** El id es el del usuario profesional. */
   PROFESSIONAL = 'PROFESSIONAL',
+  REPORT = 'REPORT',
+  SANCTION = 'SANCTION',
+  STRIKE = 'STRIKE',
+  APPEAL = 'APPEAL',
+  SUPPORT_TICKET = 'SUPPORT_TICKET',
+  ANNOUNCEMENT = 'ANNOUNCEMENT',
+  /** El id es el del usuario (alertas del admin). */
+  USER = 'USER',
 }
 
 /** Notificaciones dentro de la app (P-15). Los canales externos llegan en la etapa 13. */

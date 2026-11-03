@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager, IsNull } from 'typeorm';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { User } from '../users/entities/user.entity';
+import { AccountStatus, UserRole } from '../users/user.enums';
 import {
   Notification,
   type NotificationTarget,
@@ -54,6 +56,33 @@ export class NotificationsService {
     const notification = repository.create(input);
     await repository.insert(notification);
     return repository.findOneByOrFail({ id: notification.id });
+  }
+
+  /**
+   * Un aviso para cada admin activo. Con `dedupe`, no se crea si ese admin todavía no leyó uno del
+   * mismo tipo para el mismo objeto (señales de alerta que se repetirían).
+   */
+  async createForAdmins(
+    manager: EntityManager,
+    input: Omit<NotificationInput, 'userId'>,
+    dedupe = false,
+  ): Promise<Notification[]> {
+    const admins = await manager.getRepository(User).find({
+      where: { role: UserRole.ADMIN, status: AccountStatus.ACTIVE, deletedAt: IsNull() },
+      select: { id: true },
+    });
+    const created: Notification[] = [];
+    for (const admin of admins) {
+      if (
+        dedupe &&
+        input.targetId &&
+        (await this.hasUnread(manager, admin.id, input.type, input.targetId))
+      ) {
+        continue;
+      }
+      created.push(await this.create(manager, { ...input, userId: admin.id }));
+    }
+    return created;
   }
 
   /** Avisa por tiempo real (después del commit). */

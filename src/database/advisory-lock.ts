@@ -6,6 +6,7 @@ export const ADVISORY_LOCKS = {
   UPLOADS_CLEANUP: 7_002,
   TRIALS: 7_003,
   BILLING: 7_004,
+  SANCTIONS: 7_005,
 } as const;
 
 /**

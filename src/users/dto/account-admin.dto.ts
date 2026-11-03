@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsDateString,
   IsIn,
   IsOptional,
   IsString,
@@ -24,6 +25,27 @@ export class AccountActionDto {
   @IsString()
   @Length(10, 500)
   reason: string;
+}
+
+/** Suspensión (ADR 0029): sin fecha de fin, hasta que el admin la levante. */
+export class SuspendAccountDto extends AccountActionDto {
+  @ApiPropertyOptional({ description: 'Fecha de fin: la suspensión se levanta sola' })
+  @IsOptional()
+  @IsDateString({ strict: true })
+  endsAt?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Reporte que la originó' })
+  @IsOptional()
+  @IsUUID()
+  reportId?: string;
+}
+
+/** Baneo: dura hasta que el admin lo levante. */
+export class BanAccountDto extends AccountActionDto {
+  @ApiPropertyOptional({ format: 'uuid', description: 'Reporte que lo originó' })
+  @IsOptional()
+  @IsUUID()
+  reportId?: string;
 }
 
 /**

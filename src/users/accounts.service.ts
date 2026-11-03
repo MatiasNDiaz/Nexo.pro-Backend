@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull } from 'typeorm';
 import { AUDIT_LOGGER, type AuditLogger } from '../audit/audit-logger';
 import { type AccountDeletionScheduledEvent, AuthEvents } from '../auth/auth.events';
 import { SessionRevokeReason } from '../auth/entities/auth-session.entity';
@@ -17,6 +17,7 @@ import { SessionsService } from '../auth/services/sessions.service';
 import type { AuthUser } from '../common/decorators';
 import { type AuthConfig, authConfig } from '../config/auth.config';
 import { NeighborhoodsService } from '../locations/neighborhoods.service';
+import { Sanction, SanctionType } from '../moderation/entities/moderation.entities';
 import { ProfessionalsService } from '../professionals/professionals.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { accountsDueForAnonymization, anonymizeAccount } from './account-anonymizer';
@@ -24,6 +25,12 @@ import { ChangeRoleDto } from './dto/account-admin.dto';
 import { User } from './entities/user.entity';
 import { isIdentityApproved } from './identity-status';
 import { AccountStatus, UserRole } from './user.enums';
+
+/** Datos opcionales de la sanción: fecha de fin (solo suspensiones) y reporte que la originó. */
+export interface SanctionOptions {
+  endsAt?: Date | null;
+  reportId?: string | null;
+}
 
 /** Una cuenta que no se puede llevar a ese estado desde el actual. */
 const invalidTransition = (from: AccountStatus, action: string) =>
@@ -51,23 +58,85 @@ export class AccountsService {
     @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
   ) {}
 
-  suspend(admin: AuthUser, userId: string, reason: string): Promise<User> {
+  /**
+   * Suspensión (ADR 0029): con fecha de fin se levanta sola al llegar (tarea horaria); sin fecha,
+   * hasta que el admin la levante. Queda en el historial de sanciones.
+   */
+  suspend(
+    admin: AuthUser,
+    userId: string,
+    reason: string,
+    options: SanctionOptions = {},
+  ): Promise<User> {
+    if (options.endsAt && options.endsAt <= new Date()) {
+      throw new BadRequestException({
+        code: 'INVALID_END_DATE',
+        message: 'La fecha de fin tiene que ser en el futuro.',
+      });
+    }
     return this.changeStatus(admin, userId, reason, {
       action: 'ACCOUNT_SUSPENDED',
       verb: 'suspender',
       from: [AccountStatus.ACTIVE, AccountStatus.PENDING_VERIFICATION],
       to: () => AccountStatus.SUSPENDED,
       revoke: true,
+      sanction: { type: SanctionType.SUSPENSION, ...options },
     });
   }
 
-  ban(admin: AuthUser, userId: string, reason: string): Promise<User> {
+  /** Baneo: dura hasta que el admin lo levante; reemplaza a una suspensión en curso. */
+  ban(admin: AuthUser, userId: string, reason: string, options: SanctionOptions = {}) {
     return this.changeStatus(admin, userId, reason, {
       action: 'ACCOUNT_BANNED',
       verb: 'banear',
       from: [AccountStatus.ACTIVE, AccountStatus.PENDING_VERIFICATION, AccountStatus.SUSPENDED],
       to: () => AccountStatus.BANNED,
       revoke: true,
+      sanction: { type: SanctionType.BAN, reportId: options.reportId, endsAt: null },
+    });
+  }
+
+  /**
+   * Terminó la suspensión con fecha de fin (tarea horaria, ADR 0029): se cierra la sanción y, si no
+   * queda otra suspensión o un baneo vigente, la cuenta vuelve a su estado. Auditado sin actor.
+   * Devuelve si la levantó.
+   */
+  async endSuspension(sanctionId: string, now = new Date()): Promise<boolean> {
+    return this.dataSource.transaction(async (manager) => {
+      const sanction = await manager.getRepository(Sanction).findOne({
+        where: { id: sanctionId, type: SanctionType.SUSPENSION, liftedAt: IsNull() },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!sanction?.endsAt || sanction.endsAt > now) return false;
+      const user = await manager
+        .getRepository(User)
+        .findOneOrFail({ where: { id: sanction.userId }, lock: { mode: 'pessimistic_write' } });
+      await manager
+        .getRepository(Sanction)
+        .update(sanction.id, { liftedAt: now, liftReason: 'Terminó la suspensión' });
+      const stillSanctioned = await manager.getRepository(Sanction).existsBy({
+        userId: user.id,
+        type: In([SanctionType.SUSPENSION, SanctionType.BAN]),
+        liftedAt: IsNull(),
+      });
+      let to = user.status;
+      if (user.status === AccountStatus.SUSPENDED && !stillSanctioned) {
+        to = isIdentityApproved(user) ? AccountStatus.ACTIVE : AccountStatus.PENDING_VERIFICATION;
+        await manager.getRepository(User).update(user.id, { status: to, statusReason: null });
+      }
+      await this.audit.record(
+        {
+          actorId: null,
+          action: 'SANCTION_EXPIRED',
+          targetType: 'USER',
+          targetId: user.id,
+          reason: 'Terminó la suspensión',
+          result: 'SUCCESS',
+          metadata: { sanctionId: sanction.id, from: user.status, to },
+        },
+        manager,
+      );
+      return true;
     });
   }
 
@@ -90,6 +159,7 @@ export class AccountsService {
       await manager
         .getRepository(User)
         .update(user.id, { status, statusReason: null, deletionScheduledFor: null });
+      if (sanctioned) await this.liftAccountSanctions(manager, user.id, admin.id, reason);
       if (pendingDeletion && user.role === UserRole.PROFESSIONAL) {
         await this.professionals.reactivate(manager, user.id);
       }
@@ -236,6 +306,7 @@ export class AccountsService {
       from: AccountStatus[];
       to: (user: User) => AccountStatus;
       revoke: boolean;
+      sanction: { type: SanctionType } & SanctionOptions;
     },
   ): Promise<User> {
     return this.dataSource.transaction(async (manager) => {
@@ -246,6 +317,18 @@ export class AccountsService {
       await manager
         .getRepository(User)
         .update(user.id, { status, statusReason: restricted ? reason : null });
+      // Historial (ADR 0029): un baneo cierra la suspensión que estuviera en curso.
+      if (rule.sanction.type === SanctionType.BAN) {
+        await this.liftAccountSanctions(manager, user.id, admin.id, 'Reemplazada por un baneo');
+      }
+      await manager.getRepository(Sanction).insert({
+        userId: user.id,
+        type: rule.sanction.type,
+        reason,
+        endsAt: rule.sanction.endsAt ?? null,
+        reportId: rule.sanction.reportId ?? null,
+        appliedBy: admin.id,
+      });
       if (rule.revoke) {
         await this.sessions.revokeAllForUser(user.id, SessionRevokeReason.ACCOUNT_SUSPENDED, {
           manager,
@@ -257,6 +340,23 @@ export class AccountsService {
       });
       return manager.getRepository(User).findOneByOrFail({ id: user.id });
     });
+  }
+
+  /** Cierra las suspensiones y baneos vigentes del usuario (historial de sanciones). */
+  private async liftAccountSanctions(
+    manager: EntityManager,
+    userId: string,
+    adminId: string,
+    reason: string,
+  ): Promise<void> {
+    await manager.getRepository(Sanction).update(
+      {
+        userId,
+        type: In([SanctionType.SUSPENSION, SanctionType.BAN]),
+        liftedAt: IsNull(),
+      },
+      { liftedAt: new Date(), liftedBy: adminId, liftReason: reason },
+    );
   }
 
   private async becomeCustomer(manager: EntityManager, user: User, dto: ChangeRoleDto) {

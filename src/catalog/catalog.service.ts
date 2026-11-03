@@ -42,7 +42,8 @@ import type {
 /**
  * Quién aparece en el catálogo (se calcula en cada consulta, sin columna `is_listed`): cuenta activa,
  * identidad aprobada (o aprobada con foto o nombre en revisión, ADR 0019 y 0021), prueba o plan
- * vigente, perfil activo y completo (foto, descripción, una profesión y una zona).
+ * vigente, perfil activo y completo (foto, descripción, una profesión y una zona), y sin la
+ * sanción "perfil oculto" vigente (C-29, ADR 0029).
  */
 const VISIBLE = `
   p.deactivated_at IS NULL
@@ -53,7 +54,10 @@ const VISIBLE = `
   AND u.avatar_file_id IS NOT NULL AND p.bio IS NOT NULL
   AND EXISTS (SELECT 1 FROM professional_professions pp
                WHERE pp.professional_id = p.id AND pp.status = 'ACTIVE')
-  AND EXISTS (SELECT 1 FROM professional_service_areas a WHERE a.professional_id = p.id)`;
+  AND EXISTS (SELECT 1 FROM professional_service_areas a WHERE a.professional_id = p.id)
+  AND NOT EXISTS (SELECT 1 FROM sanctions sa
+                   WHERE sa.user_id = u.id AND sa.type = 'PROFILE_HIDDEN' AND sa.lifted_at IS NULL
+                     AND (sa.ends_at IS NULL OR sa.ends_at > now()))`;
 
 /** Suscripción vigente: una prueba o un período vencidos que la tarea todavía no marcó no cuentan. */
 const LIVE_SUBSCRIPTION = `

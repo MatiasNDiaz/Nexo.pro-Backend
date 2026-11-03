@@ -1,4 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityManager, In, IsNull } from 'typeorm';
 import { AUDIT_LOGGER, type AuditLogger } from '../audit/audit-logger';
 import type { AuthUser } from '../common/decorators';
@@ -26,6 +27,15 @@ import type {
 import { Review } from './entities/review.entity';
 import { COUNTED_REVIEW, displayName, reviewWindowEnd } from './review-rules';
 
+export const ReviewEvents = {
+  /** Reseña nueva (después del commit): moderación revisa las señales de alerta (ADR 0029). */
+  CREATED: 'reviews.created',
+} as const;
+
+export interface ReviewCreatedEvent {
+  professionalId: string;
+}
+
 const notFound = () =>
   new NotFoundException({ code: 'REVIEW_NOT_FOUND', message: 'La reseña no existe.' });
 
@@ -41,6 +51,7 @@ export class ReviewsService {
     private readonly subscriptions: SubscriptionsService,
     private readonly catalog: CatalogService,
     @Inject(AUDIT_LOGGER) private readonly audit: AuditLogger,
+    private readonly events: EventEmitter2,
   ) {}
 
   async create(customer: AuthUser, dto: CreateReviewDto, now = new Date()): Promise<OwnReviewDto> {
@@ -91,6 +102,8 @@ export class ReviewsService {
       return row;
     });
     this.notifications.deliver(created);
+    const event: ReviewCreatedEvent = { professionalId: review.professionalId };
+    await this.events.emitAsync(ReviewEvents.CREATED, event);
     return this.own(review.id);
   }
 
