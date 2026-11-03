@@ -238,6 +238,8 @@ Etapa 13.2 (ADR 0031): `auth_sessions.device_hash` (HMAC de la cookie `nx_device
 
 Etapa 13.3 (ADR 0032): `push_subscriptions` (un navegador por fila: `endpoint` único y solo de servicios de push conocidos, claves del navegador, cuenta y familia de sesión; se borra con la cuenta, a las 5 fallas seguidas, cuando el servicio dice que no existe y en la limpieza diaria si el dispositivo ya no tiene sesión) y `notification_preferences` (clave cuenta + categoría; sin fila, push activado), con el enum `notification_category`. La categoría de cada tipo de notificación vive en el código (`src/notifications/notification-categories.ts`).
 
+Etapa 13.4 (ADR 0033): `professional_metrics_daily` (clave profesional + día de Córdoba; personas distintas que abrieron el perfil, que lo vieron en resultados y que lo vieron primero). Solo totales: quién miró no se guarda. Se borran los días de más de 25 meses. Pedidos, trabajos terminados y reseñas se calculan desde `service_request_targets`, `service_contracts` y `reviews`.
+
 Al anonimizar una cuenta, sus
 archivos pasan a `DELETED` y se borran del proveedor.
 

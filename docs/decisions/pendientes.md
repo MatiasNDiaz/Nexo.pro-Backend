@@ -83,13 +83,13 @@ Pedido del 03/11/2026. Con **2FA activado en todas** (y en GitHub, Railway, Verc
 Están en `src/database/seeds/catalogs.data.ts`. Se cambian desde la base (el admin, a partir de la
 etapa 7): el seed nunca pisa lo que ya existe.
 
-| Dato                                 | Valor cargado                                                                              | Qué falta                                                  | Bloquea    |
-| ------------------------------------ | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- | ---------- |
-| Localidades de Córdoba               | 1 provincia y 1 localidad (Córdoba capital). Los barrios los crean los usuarios (ADR 0010) | ¿Qué otras localidades se habilitan?                       | Producción |
-| Coordenadas de localidades y barrios | Ninguna (`null`)                                                                           | Fuente oficial; las necesita "cerca de mí" (P-11)          | Etapa 7    |
-| Oficios                              | 10 de ejemplo                                                                              | Catálogo definitivo del fundador                           | Producción |
-| Precios de los planes                | $10.000 / $15.000 / $20.000 ARS                                                            | Confirmar vigencia (FI §6.3)                               | Producción |
-| Imágenes de Basic y Medium           | 5 en total                                                                                 | ¿Se valida el reparto "2 de presentación + 3 de trabajos"? | Etapa 7    |
-| Métricas en Medium                   | No                                                                                         | "No confirmado" en FI §6.3                                 | Etapa 13   |
-| Ranking por plan                     | `ranking_tier` 0 / 1 / 2                                                                   | Pesos del ranking (P-10)                                   | Etapa 7    |
-| Etiqueta "Recomendado" de Premium    | Sin modelar                                                                                | Cómo se muestra y si es un campo del plan                  | Etapa 7    |
+| Dato                                 | Valor cargado                                                                              | Qué falta                                                                          | Bloquea    |
+| ------------------------------------ | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | ---------- |
+| Localidades de Córdoba               | 1 provincia y 1 localidad (Córdoba capital). Los barrios los crean los usuarios (ADR 0010) | ¿Qué otras localidades se habilitan?                                               | Producción |
+| Coordenadas de localidades y barrios | Ninguna (`null`)                                                                           | Fuente oficial; las necesita "cerca de mí" (P-11)                                  | Etapa 7    |
+| Oficios                              | 10 de ejemplo                                                                              | Catálogo definitivo del fundador                                                   | Producción |
+| Precios de los planes                | $10.000 / $15.000 / $20.000 ARS                                                            | Confirmar vigencia (FI §6.3)                                                       | Producción |
+| Imágenes de Basic y Medium           | 5 en total                                                                                 | ¿Se valida el reparto "2 de presentación + 3 de trabajos"?                         | Etapa 7    |
+| Métricas en Medium                   | No (`metrics_enabled = false`)                                                             | Por ahora solo Premium (03/11/2026, ADR 0033); el fundador decide si activa Medium | Decisión   |
+| Ranking por plan                     | `ranking_tier` 0 / 1 / 2                                                                   | Pesos del ranking (P-10)                                                           | Etapa 7    |
+| Etiqueta "Recomendado" de Premium    | Sin modelar                                                                                | Cómo se muestra y si es un campo del plan                                          | Etapa 7    |

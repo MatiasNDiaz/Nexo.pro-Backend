@@ -39,4 +39,6 @@ Formato: contexto, decisión, consecuencias, fecha. Para cambiar una decisión s
 
 | [0032](0032-notificaciones-push.md) | Push web con `web-push`: mismo texto que en la plataforma, nunca el mensaje; sin push con la app abierta; categorías que se apagan |
 
+| [0033](0033-metricas-premium.md) | Métricas Premium: personas distintas por día, solo totales en la base, se cuentan para todos y las ve Premium; 25 meses |
+
 Las decisiones todavía abiertas están en [pendientes.md](pendientes.md).

@@ -87,18 +87,20 @@ probado en la CI). Si la migración borró datos, restaurar un backup (sección 
 
 ## 3. Tareas programadas
 
-Corren dentro de la API. Todas menos las alertas usan un lock de PostgreSQL por si hubiera dos
-instancias (las alertas cuentan en la memoria de cada una):
+Corren dentro de la API. Todas menos las alertas y el guardado de métricas usan un lock de
+PostgreSQL por si hubiera dos instancias (esas dos cuentan en la memoria de cada una):
 
-| Tarea                   | Cuándo          | Qué hace                                                                                                          |
-| ----------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Purga de cuentas        | 3:00            | Anonimiza las bajas con la gracia vencida                                                                         |
-| Limpieza de sesiones    | 4:00            | Borra sesiones vencidas (dispositivo vencido y +30 días), enlaces usados o vencidos (+7) y pedidos de Google (+1) |
-| Pruebas y recordatorios | 9:00            | Vence pruebas y manda los recordatorios de prueba y de vencimiento                                                |
-| Archivos                | cada hora       | Descarta subidas abandonadas y reintenta borrados fallidos en el almacenamiento                                   |
-| Períodos pagos          | cada hora (:05) | Vence períodos y aplica cambios de plan programados                                                               |
-| Sanciones               | cada hora (:10) | Levanta suspensiones y perfiles ocultos con fecha de fin                                                          |
-| Alertas de seguridad    | cada 15 min     | Picos de logins fallidos, bloqueos, tokens reutilizados, 401/403 y 500                                            |
+| Tarea                   | Cuándo          | Qué hace                                                                                                                                         |
+| ----------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Purga de cuentas        | 3:00            | Anonimiza las bajas con la gracia vencida                                                                                                        |
+| Limpieza de sesiones    | 4:00            | Borra sesiones vencidas (dispositivo vencido y +30 días), enlaces usados o vencidos (+7), pedidos de Google (+1) y suscripciones push sin sesión |
+| Limpieza de métricas    | 4:30            | Borra los días de métricas con más de 25 meses (ADR 0033)                                                                                        |
+| Guardado de métricas    | cada minuto     | Guarda los contadores de visitas y búsquedas que se acumulan en memoria                                                                          |
+| Pruebas y recordatorios | 9:00            | Vence pruebas y manda los recordatorios de prueba y de vencimiento                                                                               |
+| Archivos                | cada hora       | Descarta subidas abandonadas y reintenta borrados fallidos en el almacenamiento                                                                  |
+| Períodos pagos          | cada hora (:05) | Vence períodos y aplica cambios de plan programados                                                                                              |
+| Sanciones               | cada hora (:10) | Levanta suspensiones y perfiles ocultos con fecha de fin                                                                                         |
+| Alertas de seguridad    | cada 15 min     | Picos de logins fallidos, bloqueos, tokens reutilizados, 401/403 y 500                                                                           |
 
 Horas de Córdoba.
 
