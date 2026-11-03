@@ -19,7 +19,7 @@ agrega su parte y la documenta acá.
 Un test de integración compara las entidades con el esquema real que dejan las migraciones; si alguien
 cambia una entidad sin migración (o al revés), falla.
 
-## Diagrama (etapas 4 a 7B)
+## Diagrama (etapas 4 a 8)
 
 ```mermaid
 erDiagram
@@ -29,6 +29,15 @@ erDiagram
   neighborhoods |o--o{ users : "barrio donde vive (cliente)"
   users ||--o{ auth_sessions : "abre"
   users ||--o{ auth_identities : "vincula Google"
+  users ||--o{ conversations : "cliente y profesional"
+  conversations ||--o{ messages : ""
+  messages ||--o{ message_attachments : ""
+  users ||--o{ service_requests : "cliente"
+  service_requests ||--|{ service_request_targets : "enviado a"
+  service_request_targets ||--o{ quotes : "presupuestos"
+  service_requests ||--o| service_contracts : ""
+  service_contracts ||--o{ service_contract_history : "transiciones"
+  users ||--o{ notifications : ""
   users |o--o{ oauth_pending_requests : "vinculación pendiente"
   auth_sessions |o--o| auth_sessions : "replaced_by_id"
   users ||--o{ one_time_tokens : "recibe"

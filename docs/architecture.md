@@ -14,7 +14,8 @@ Monolito modular NestJS (plan §5–7). Controllers delgados, reglas de negocio 
 | 7.2 Perfiles y planes       | Hecha: perfil de cliente y profesional, medios, certificados, redes, horarios, personalización, prueba de 30 días con recordatorios, cambio de foto en revisión                                          |
 | 7.3 Catálogo                | Hecha: catálogo público con filtros y orden (ADR 0022), página pública por slug, edición de datos personales (ADR 0021)                                                                                  |
 | 7B Login con Google         | Hecha: OpenID Connect con PKCE (adaptador simulado hasta tener credenciales), vinculación con contraseña o email, registro con Google, cuentas sin contraseña                                            |
-| 8–13                        | Pendientes (ver `docs/roadmap.md`, incluye la etapa 7B de login con Google)                                                                                                                              |
+| 8 Chat y contrataciones     | Hecha: chat con adjuntos privados, solicitudes a varios profesionales, presupuestos, contrataciones con transiciones, notificaciones internas y tiempo real (Socket.IO)                                  |
+| 9–13                        | Pendientes (ver `docs/roadmap.md`, incluye la etapa 7B de login con Google)                                                                                                                              |
 
 ## Estructura actual
 
@@ -51,6 +52,10 @@ src/
 ├── integrations/storage/   # StorageProvider + Cloudinary / disco local, detección de tipo real
 ├── integrations/oauth/     # OAuthProvider + Google (openid-client) / simulado
 ├── integrations/identity/  # IdentityVerificationProvider + manual / simulado (fake)
+├── chat/                   # conversaciones, mensajes, adjuntos privados
+├── requests/               # solicitudes, presupuestos, contrataciones y su máquina de estados
+├── notifications/          # notificaciones internas
+├── realtime/               # gateway y adaptador de Socket.IO (avisos)
 ├── catalog/                # catálogo público: búsqueda, orden y página del profesional
 ├── uploads/                # stored_files, tickets de subida, confirmación, foto de perfil, limpieza
 ├── identity-verification/  # intentos, webhook del proveedor, cola y decisiones del admin
@@ -179,3 +184,17 @@ Detalle de cada guard en `docs/authorization.md`. El de suscripción/plan llega 
 - **`SessionResponderService`**: un solo lugar entrega las cookies de sesión (login, MFA y Google).
 - **La vinculación nunca es automática**: el pedido pendiente guarda solo hashes de tokens y vence a
   los 30 minutos; vincular con contraseña usa el mismo bloqueo progresivo que el login.
+
+**Etapa 8**
+
+- **Socket.IO solo avisa**: los mensajes y las acciones van por REST (validación, CSRF, límites,
+  auditoría); el gateway emite `message:new`, `message:updated`, `conversation:read` y
+  `notification:new` a la sala de cada usuario, **después del commit**.
+- **Conexión autenticada con la cookie de acceso** (mismas reglas que HTTP) y el adaptador rechaza
+  orígenes fuera de `FRONTEND_ORIGINS`. Cada minuto se revisa que la sesión siga viva.
+- **Sin ciclos**: las solicitudes escriben mensajes automáticos en el chat; el chat avisa que un
+  profesional respondió con un evento interno (`chat.message-sent`) en lugar de importar solicitudes.
+- **Transiciones de la contratación en una tabla** (`contract-state-machine.ts`) con el actor
+  permitido; todo cambio bloquea la fila y guarda la transición.
+- **Archivos privados**: Cloudinary `type=authenticated` con enlaces firmados de 5 minutos; en disco,
+  la API entrega el contenido después de autorizar.

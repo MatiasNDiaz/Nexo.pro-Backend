@@ -28,5 +28,7 @@ Formato: contexto, decisión, consecuencias, fecha. Para cambiar una decisión s
 | [0021](0021-edicion-de-datos-personales.md)           | Edición de datos: teléfono libre; nombre en revisión con identidad aprobada; el admin edita con motivo                                |
 | [0022](0022-orden-del-catalogo.md)                    | Orden provisional del catálogo: plan, disponibles, perfiles más completos                                                             |
 | [0023](0023-cuentas-con-google.md)                    | Google con openid-client; contraseña opcional; sesión reciente para crear contraseña o darse de baja; desvincular solo con contraseña |
+| [0024](0024-chat-y-mensajes.md)                       | Chat: Socket.IO en la misma API, un chat por pareja, editar 15 min, original solo para el admin ante un reporte                       |
+| [0025](0025-solicitudes-y-contrataciones.md)          | Solicitudes y contrataciones: negociación por profesional y contratación con transiciones                                             |
 
 Las decisiones todavía abiertas están en [pendientes.md](pendientes.md).
