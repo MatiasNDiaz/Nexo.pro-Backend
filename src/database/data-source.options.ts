@@ -1,5 +1,6 @@
 import type { DataSourceOptions } from 'typeorm';
 import { AdminAuditLog } from '../audit/entities/admin-audit-log.entity';
+import { AuthIdentity, OAuthPendingRequest } from '../auth/entities/auth-identity.entity';
 import { AuthSession } from '../auth/entities/auth-session.entity';
 import { OneTimeToken } from '../auth/entities/one-time-token.entity';
 import { UserMfaSettings } from '../auth/entities/user-mfa-settings.entity';
@@ -53,6 +54,8 @@ export const ENTITIES = [
   AvailabilityException,
   Subscription,
   SubscriptionHistory,
+  AuthIdentity,
+  OAuthPendingRequest,
 ];
 
 export interface ConnectionSettings {

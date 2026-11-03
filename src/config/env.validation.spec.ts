@@ -156,6 +156,13 @@ describe('validateEnv', () => {
         }),
       ).toThrow(/IDENTITY_PROVIDER/);
     });
+
+    it('prohíbe el login con Google simulado y exige callback https', () => {
+      const callback = 'http://api.example.com/api/v1/auth/google/callback';
+      expect(() =>
+        validateEnv({ ...prod, GOOGLE_PROVIDER: 'fake', GOOGLE_CALLBACK_URL: callback }),
+      ).toThrow(/GOOGLE_PROVIDER.*GOOGLE_CALLBACK_URL/s);
+    });
   });
 
   describe('archivos e identidad', () => {
@@ -191,6 +198,16 @@ describe('validateEnv', () => {
           CLOUDINARY_API_SECRET: 'secreto-largo-de-prueba',
         }).STORAGE_PROVIDER,
       ).toBe('cloudinary');
+    });
+
+    it('login con Google: apagado por defecto; activado exige credenciales y callback', () => {
+      expect(validateEnv(base).GOOGLE_PROVIDER).toBe('disabled');
+      expect(() => validateEnv({ ...base, GOOGLE_PROVIDER: 'google' })).toThrow(
+        /GOOGLE_CLIENT_ID.*GOOGLE_CLIENT_SECRET.*GOOGLE_CALLBACK_URL/s,
+      );
+      expect(() => validateEnv({ ...base, GOOGLE_PROVIDER: 'fake' })).toThrow(
+        /GOOGLE_CALLBACK_URL/,
+      );
     });
 
     it('el proveedor simulado exige su secreto de webhooks', () => {

@@ -11,6 +11,10 @@ export function buildCookieNames(secure: boolean) {
     refresh: secure ? '__Secure-nx_rt' : 'nx_rt',
     csrf: secure ? '__Host-nx_csrf' : 'nx_csrf',
     mfa: secure ? '__Secure-nx_mfa' : 'nx_mfa',
+    /** Datos del intercambio con Google (state, PKCE, nonce), cifrados. 10 minutos. */
+    oauth: secure ? '__Secure-nx_oauth' : 'nx_oauth',
+    /** Vinculación o registro con Google a medio terminar (ADR 0015). 30 minutos. */
+    oauthPending: secure ? '__Secure-nx_oauth_pending' : 'nx_oauth_pending',
   };
 }
 
@@ -42,7 +46,14 @@ export const authConfig = registerAs('auth', () => {
     cookies: {
       secure: env.COOKIE_SECURE,
       names: buildCookieNames(env.COOKIE_SECURE),
-      paths: { access: '/', refresh: authPath, csrf: '/', mfa: `${authPath}/mfa` },
+      paths: {
+        access: '/',
+        refresh: authPath,
+        csrf: '/',
+        mfa: `${authPath}/mfa`,
+        oauth: `${authPath}/google`,
+        oauthPending: `${authPath}/google`,
+      },
     },
     csrfSecret: env.CSRF_SECRET,
     passwordSelfResetEnabled: env.PASSWORD_SELF_RESET_ENABLED,

@@ -21,6 +21,8 @@ export const STORAGE_PROVIDERS = ['local', 'cloudinary'] as const;
 export type StorageProviderName = (typeof STORAGE_PROVIDERS)[number];
 
 export const IDENTITY_PROVIDERS = ['manual', 'fake'] as const;
+export const GOOGLE_PROVIDERS = ['disabled', 'google', 'fake'] as const;
+export type GoogleProviderName = (typeof GOOGLE_PROVIDERS)[number];
 export type IdentityProviderName = (typeof IDENTITY_PROVIDERS)[number];
 
 export const MAIL_PROVIDERS = ['console', 'memory'] as const;
@@ -258,6 +260,27 @@ export class EnvironmentVariables {
   @MinLength(32)
   FAKE_IDENTITY_WEBHOOK_SECRET?: string;
 
+  // ---- Login con Google (ADR 0015 y 0023) ----
+
+  /** `disabled` (sin botón de Google), `google` o `fake` (simulado: prohibido en producción). */
+  @IsIn(GOOGLE_PROVIDERS)
+  GOOGLE_PROVIDER: GoogleProviderName = 'disabled';
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  GOOGLE_CLIENT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  GOOGLE_CLIENT_SECRET?: string;
+
+  /** URL pública de `/api/v1/auth/google/callback` (la registrada en Google Cloud). */
+  @IsOptional()
+  @Matches(/^https?:\/\/[a-z0-9.-]+(:\d{1,5})?\/\S*$/i)
+  GOOGLE_CALLBACK_URL?: string;
+
   /** Días que una cuenta dada de baja queda restaurable antes de anonimizarse (ADR 0016). */
   @Transform(toInt)
   @IsInt()
@@ -285,6 +308,14 @@ function providerRules(env: EnvironmentVariables): string[] {
       if (!env[name]) problems.push(`${name} (obligatoria con STORAGE_PROVIDER=cloudinary)`);
     }
   }
+  if (env.GOOGLE_PROVIDER === 'google') {
+    for (const name of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'] as const) {
+      if (!env[name]) problems.push(`${name} (obligatoria con GOOGLE_PROVIDER=google)`);
+    }
+  }
+  if (env.GOOGLE_PROVIDER !== 'disabled' && !env.GOOGLE_CALLBACK_URL) {
+    problems.push('GOOGLE_CALLBACK_URL (obligatoria con el login con Google activado)');
+  }
   if (env.IDENTITY_PROVIDER === 'fake' && !env.FAKE_IDENTITY_WEBHOOK_SECRET) {
     problems.push('FAKE_IDENTITY_WEBHOOK_SECRET (obligatoria con IDENTITY_PROVIDER=fake)');
   }
@@ -301,6 +332,12 @@ function productionRules(env: EnvironmentVariables): string[] {
   }
   if (env.IDENTITY_PROVIDER === 'fake') {
     problems.push('IDENTITY_PROVIDER (el proveedor simulado está prohibido en producción)');
+  }
+  if (env.GOOGLE_PROVIDER === 'fake') {
+    problems.push('GOOGLE_PROVIDER (el login simulado está prohibido en producción)');
+  }
+  if (env.GOOGLE_CALLBACK_URL && !env.GOOGLE_CALLBACK_URL.startsWith('https://')) {
+    problems.push('GOOGLE_CALLBACK_URL (en producción debe ser https)');
   }
   if (env.SWAGGER_ENABLED) problems.push('SWAGGER_ENABLED (no se permite en producción)');
   if (env.FRONTEND_ORIGINS.some((origin) => !origin.startsWith('https://'))) {

@@ -28,6 +28,7 @@ import { AccountStatus, UserRole, VerificationStatus } from '../user.enums';
 // Parcial (solo cuentas en gracia): creado en la migración.
 @Index('ix_users_deletion_scheduled_for', { synchronize: false })
 @Check('ck_users_failed_login_attempts', 'failed_login_attempts >= 0')
+@Check('ck_users_admin_password', "role <> 'ADMIN' OR password_hash IS NOT NULL")
 @Check('ck_users_pending_name', '(pending_first_name IS NULL) = (pending_last_name IS NULL)')
 // Las cuentas borradas se anonimizan (ADR 0013) y pierden el barrio.
 @Check(
@@ -41,9 +42,12 @@ export class User {
   @Column({ type: 'citext' })
   email: string;
 
-  /** Nunca se carga salvo que se pida explícitamente (`addSelect`). */
-  @Column({ type: 'text', select: false })
-  passwordHash: string;
+  /**
+   * Nunca se carga salvo que se pida explícitamente (`addSelect`). Null en cuentas creadas con
+   * Google que todavía no definieron contraseña (ADR 0023); el admin siempre tiene.
+   */
+  @Column({ type: 'text', select: false, nullable: true })
+  passwordHash: string | null;
 
   @Column({ type: 'enum', enum: UserRole, enumName: 'user_role' })
   role: UserRole;
