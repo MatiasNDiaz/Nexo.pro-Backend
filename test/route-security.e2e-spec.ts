@@ -39,6 +39,8 @@ const PUBLIC_ROUTES = new Set([
   'GET /api/v1/uploads/:id/content',
   // Webhook del proveedor de identidad: autenticado por firma, no por sesión.
   'POST /api/v1/webhooks/identity',
+  // Avisos de Mercado Pago: autenticados por la firma x-signature (ADR 0026).
+  'POST /api/v1/webhooks/payments',
 ]);
 
 interface RouteLayer {

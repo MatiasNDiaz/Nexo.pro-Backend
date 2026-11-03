@@ -163,6 +163,17 @@ describe('validateEnv', () => {
         validateEnv({ ...prod, GOOGLE_PROVIDER: 'fake', GOOGLE_CALLBACK_URL: callback }),
       ).toThrow(/GOOGLE_PROVIDER.*GOOGLE_CALLBACK_URL/s);
     });
+
+    it('prohíbe los pagos simulados y exige la URL pública https', () => {
+      expect(() =>
+        validateEnv({
+          ...prod,
+          PAYMENTS_PROVIDER: 'fake',
+          MERCADOPAGO_WEBHOOK_SECRET: 'w'.repeat(40),
+          API_PUBLIC_URL: 'http://api.example.com',
+        }),
+      ).toThrow(/PAYMENTS_PROVIDER.*API_PUBLIC_URL/s);
+    });
   });
 
   describe('archivos e identidad', () => {
@@ -208,6 +219,21 @@ describe('validateEnv', () => {
       expect(() => validateEnv({ ...base, GOOGLE_PROVIDER: 'fake' })).toThrow(
         /GOOGLE_CALLBACK_URL/,
       );
+    });
+
+    it('pagos: apagados por defecto; activados exigen clave del webhook y URL pública', () => {
+      expect(validateEnv(base).PAYMENTS_PROVIDER).toBe('disabled');
+      expect(() => validateEnv({ ...base, PAYMENTS_PROVIDER: 'mercadopago' })).toThrow(
+        /MERCADOPAGO_ACCESS_TOKEN.*MERCADOPAGO_WEBHOOK_SECRET.*API_PUBLIC_URL/s,
+      );
+      expect(
+        validateEnv({
+          ...base,
+          PAYMENTS_PROVIDER: 'fake',
+          MERCADOPAGO_WEBHOOK_SECRET: 'w'.repeat(40),
+          API_PUBLIC_URL: 'http://localhost:3001',
+        }).PAYMENTS_PROVIDER,
+      ).toBe('fake');
     });
 
     it('el proveedor simulado exige su secreto de webhooks', () => {
