@@ -17,7 +17,7 @@ Detalle de alcance, bloqueos y criterios de aceptación: plan §16. Una rama por
 | 7.3    | Catálogo público, filtros y página pública; edición de datos personales (ADR 0021 y 0022)                                                  | ✅ Aprobada                      |
 | **7B** | **Login con Google** para clientes y profesionales (ADR 0015)                                                                              | ✅ Aprobada (adaptador simulado) |
 | 8      | Chat, solicitudes y contrataciones; notificaciones internas y tiempo real                                                                  | ✅ Aprobada                      |
-| 9      | Suscripciones y pagos con Mercado Pago (proveedor confirmado)                                                                              | Pendiente                        |
+| 9      | Suscripciones y pagos con Mercado Pago (ADR 0026)                                                                                          | En revisión (adaptador simulado) |
 | 10     | Reputación y comunidad: reseñas, favoritos, foro                                                                                           | Pendiente                        |
 | 11     | Moderación, soporte, administración y auditoría                                                                                            | Pendiente                        |
 | 12     | Hardening y preparación para producción                                                                                                    | Pendiente                        |

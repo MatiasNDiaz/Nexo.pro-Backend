@@ -86,6 +86,18 @@ otro ambiente) y `TRUST_PROXY=1`, para que cada cliente de los e2e simule su pro
 | `GOOGLE_CLIENT_SECRET` | Con `google`          | —          | **Secreto** del cliente OAuth                                                                        |
 | `GOOGLE_CALLBACK_URL`  | Con `google` o `fake` | —          | URL pública de `/api/v1/auth/google/callback`, igual a la registrada en Google (https en producción) |
 
+## Pagos con Mercado Pago (etapa 9, ADR 0026)
+
+| Variable                     | Obligatoria       | Defecto    | Descripción                                                                                              |
+| ---------------------------- | ----------------- | ---------- | -------------------------------------------------------------------------------------------------------- |
+| `PAYMENTS_PROVIDER`          | No                | `disabled` | `disabled` (sin cobros: el checkout responde 503), `mercadopago` o `fake` (prohibido en producción)      |
+| `MERCADOPAGO_ACCESS_TOKEN`   | Con `mercadopago` | —          | **Secreto**: access token de la cuenta (de prueba o productiva)                                          |
+| `MERCADOPAGO_WEBHOOK_SECRET` | Con pagos activos | —          | **Secreto** de las notificaciones (Tus integraciones > Webhooks): valida `x-signature`. ≥ 32             |
+| `API_PUBLIC_URL`             | Con pagos activos | —          | URL pública de la API sin prefijo; el webhook queda en `/api/v1/webhooks/payments` (https en producción) |
+
+La vuelta del checkout va a `FRONTEND_URL/suscripcion/resultado` (el frontend consulta
+`GET /subscriptions/me`: el pago se aplica cuando llega el aviso de Mercado Pago, no con la vuelta).
+
 ## Docker Compose (`.env`)
 
 | Variable                | Defecto         | Descripción                                                       |

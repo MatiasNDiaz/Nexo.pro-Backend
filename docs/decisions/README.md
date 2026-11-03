@@ -30,5 +30,6 @@ Formato: contexto, decisión, consecuencias, fecha. Para cambiar una decisión s
 | [0023](0023-cuentas-con-google.md)                    | Google con openid-client; contraseña opcional; sesión reciente para crear contraseña o darse de baja; desvincular solo con contraseña |
 | [0024](0024-chat-y-mensajes.md)                       | Chat: Socket.IO en la misma API, un chat por pareja, editar 15 min, original solo para el admin ante un reporte                       |
 | [0025](0025-solicitudes-y-contrataciones.md)          | Solicitudes y contrataciones: negociación por profesional y contratación con transiciones                                             |
+| [0026](0026-pagos-con-mercado-pago.md)                | Pagos con Mercado Pago: checkout manual mensual, control de coincidencia y reversión por reembolso o contracargo                      |
 
 Las decisiones todavía abiertas están en [pendientes.md](pendientes.md).

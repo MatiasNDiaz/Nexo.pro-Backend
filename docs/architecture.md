@@ -15,7 +15,8 @@ Monolito modular NestJS (plan §5–7). Controllers delgados, reglas de negocio 
 | 7.3 Catálogo                | Hecha: catálogo público con filtros y orden (ADR 0022), página pública por slug, edición de datos personales (ADR 0021)                                                                                  |
 | 7B Login con Google         | Hecha: OpenID Connect con PKCE (adaptador simulado hasta tener credenciales), vinculación con contraseña o email, registro con Google, cuentas sin contraseña                                            |
 | 8 Chat y contrataciones     | Hecha: chat con adjuntos privados, solicitudes a varios profesionales, presupuestos, contrataciones con transiciones, notificaciones internas y tiempo real (Socket.IO)                                  |
-| 9–13                        | Pendientes (ver `docs/roadmap.md`, incluye la etapa 7B de login con Google)                                                                                                                              |
+| 9 Pagos                     | Hecha (en revisión): checkout manual de Mercado Pago (adaptador simulado), webhook firmado e idempotente, control de coincidencia, reversión por reembolso, cambios de plan y vencimientos               |
+| 10–13                       | Pendientes (ver `docs/roadmap.md`)                                                                                                                                                                       |
 
 ## Estructura actual
 
@@ -52,6 +53,8 @@ src/
 ├── integrations/storage/   # StorageProvider + Cloudinary / disco local, detección de tipo real
 ├── integrations/oauth/     # OAuthProvider + Google (openid-client) / simulado
 ├── integrations/identity/  # IdentityVerificationProvider + manual / simulado (fake)
+├── integrations/payments/  # PaymentProvider + Mercado Pago (fetch) / simulado; firma x-signature
+├── payments/               # pagos, webhook, cálculo del período (subscription-ledger), tarea horaria
 ├── chat/                   # conversaciones, mensajes, adjuntos privados
 ├── requests/               # solicitudes, presupuestos, contrataciones y su máquina de estados
 ├── notifications/          # notificaciones internas
@@ -62,7 +65,7 @@ src/
 ├── audit/                  # AuditService (puerto AUDIT_LOGGER), global
 ├── locations/              # provincias, localidades, barrios (autocompletado y moderación del admin)
 ├── professions/            # catálogo público de oficios
-├── subscriptions/          # planes, prueba de 30 días, recordatorios y vencimiento (tarea diaria)
+├── subscriptions/          # planes, prueba de 30 días, recordatorios (prueba y período) y vencimiento de pruebas
 └── health/                 # GET /api/v1/health/live y /ready
 test/
 ├── setup/                  # reset de la base de test (globalSetup)
