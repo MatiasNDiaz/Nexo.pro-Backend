@@ -19,8 +19,8 @@ Detalle de alcance, bloqueos y criterios de aceptación: plan §16. Una rama por
 | 8      | Chat, solicitudes y contrataciones; notificaciones internas y tiempo real                                                                  | ✅ Aprobada                      |
 | 9      | Suscripciones y pagos con Mercado Pago (ADR 0026)                                                                                          | ✅ Aprobada (adaptador simulado) |
 | 10     | Reputación y comunidad: reseñas, favoritos, foro (ADR 0027 y 0028)                                                                         | ✅ Aprobada                      |
-| 11     | Moderación, soporte, administración y auditoría (ADR 0029)                                                                                 | En revisión                      |
-| 12     | Hardening y preparación para producción                                                                                                    | Pendiente                        |
+| 11     | Moderación, soporte, administración y auditoría (ADR 0029)                                                                                 | ✅ Aprobada                      |
+| 12     | Hardening y preparación para producción (`docs/revision-seguridad.md`, `docs/operacion.md`)                                                | En revisión                      |
 | 13     | Premium y avanzadas: métricas, push, WhatsApp, chatbot/agenda, identidad automática                                                        | Pendiente                        |
 
 Google OAuth estaba en la etapa 13 (plan §16); el fundador lo adelantó a 7B.

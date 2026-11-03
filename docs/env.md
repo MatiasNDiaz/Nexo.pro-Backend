@@ -18,22 +18,23 @@ La app, la CLI de migraciones y los tests leen `.env.<NODE_ENV>.local` y despué
 
 ## Variables de la API
 
-| Variable                  | Obligatoria | Defecto        | Descripción                                                                                                           |
-| ------------------------- | ----------- | -------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                | Sí          | —              | `development`, `test` o `production`                                                                                  |
-| `PORT`                    | No          | `3001`         | Puerto HTTP (Next.js usa el 3000)                                                                                     |
-| `API_PREFIX`              | No          | `api`          | Prefijo global; la versión va por URI: `/api/v1/...`                                                                  |
-| `FRONTEND_ORIGINS`        | Sí          | —              | Orígenes exactos del frontend separados por coma. Sin comodines, sin path ni barra final. En producción, solo `https` |
-| `TRUST_PROXY`             | No          | `0`            | Cantidad de proxies delante de la API (Railway: `1`). Afecta la IP que ven el rate limit y los logs                   |
-| `BODY_LIMIT`              | No          | `100kb`        | Tamaño máximo del body JSON/urlencoded                                                                                |
-| `SWAGGER_ENABLED`         | No          | `false`        | Publica `/api/docs`. **Prohibido en producción** (la validación lo rechaza)                                           |
-| `LOG_LEVEL`               | No          | `info`         | `fatal`, `error`, `warn`, `info`, `debug`, `trace` o `silent`                                                         |
-| `THROTTLE_TTL_MS`         | No          | `60000`        | Ventana del rate limit global (ms)                                                                                    |
-| `THROTTLE_LIMIT`          | No          | `100`          | Requests por IP en esa ventana                                                                                        |
-| `DATABASE_URL`            | Sí          | —              | `postgres://usuario:clave@host:puerto/base` del **rol de runtime** (sin DDL)                                          |
-| `DATABASE_MIGRATIONS_URL` | No          | `DATABASE_URL` | Conexión del **dueño del esquema**, solo para migraciones y seeds                                                     |
-| `DB_SSL`                  | No          | `false`        | TLS hacia PostgreSQL (verifica el certificado). En la red privada de Railway no hace falta                            |
-| `DB_POOL_MAX`             | No          | `10`           | Conexiones máximas del pool                                                                                           |
+| Variable                  | Obligatoria | Defecto        | Descripción                                                                                                                          |
+| ------------------------- | ----------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `NODE_ENV`                | Sí          | —              | `development`, `test` o `production`                                                                                                 |
+| `PORT`                    | No          | `3001`         | Puerto HTTP (Next.js usa el 3000)                                                                                                    |
+| `API_PREFIX`              | No          | `api`          | Prefijo global; la versión va por URI: `/api/v1/...`                                                                                 |
+| `FRONTEND_ORIGINS`        | Sí          | —              | Orígenes exactos del frontend separados por coma. Sin comodines, sin path ni barra final. En producción, solo `https`                |
+| `TRUST_PROXY`             | No          | `0`            | Cantidad de proxies delante de la API (Railway: `1`). Afecta la IP que ven el rate limit y los logs. **En producción, al menos `1`** |
+| `BODY_LIMIT`              | No          | `100kb`        | Tamaño máximo del body JSON/urlencoded                                                                                               |
+| `SWAGGER_ENABLED`         | No          | `false`        | Publica `/api/docs`. **Prohibido en producción** (la validación lo rechaza)                                                          |
+| `LOG_LEVEL`               | No          | `info`         | `fatal`, `error`, `warn`, `info`, `debug`, `trace` o `silent`                                                                        |
+| `THROTTLE_TTL_MS`         | No          | `60000`        | Ventana del rate limit global (ms)                                                                                                   |
+| `THROTTLE_LIMIT`          | No          | `100`          | Requests por IP en esa ventana                                                                                                       |
+| `DATABASE_URL`            | Sí          | —              | `postgres://usuario:clave@host:puerto/base` del **rol de runtime** (sin DDL)                                                         |
+| `DATABASE_MIGRATIONS_URL` | No          | `DATABASE_URL` | Conexión del **dueño del esquema**, solo para migraciones y seeds                                                                    |
+| `DB_SSL`                  | No          | `false`        | TLS hacia PostgreSQL (verifica el certificado). En la red privada de Railway no hace falta                                           |
+| `DB_POOL_MAX`             | No          | `10`           | Conexiones máximas del pool                                                                                                          |
+| `DB_STATEMENT_TIMEOUT_MS` | No          | `15000`        | Tiempo máximo de una consulta de la app (las migraciones no lo usan); una transacción sin actividad se corta al doble                |
 
 ## Variables de autenticación (etapa 5)
 
@@ -97,6 +98,20 @@ otro ambiente) y `TRUST_PROXY=1`, para que cada cliente de los e2e simule su pro
 
 La vuelta del checkout va a `FRONTEND_URL/suscripcion/resultado` (el frontend consulta
 `GET /subscriptions/me`: el pago se aplica cuando llega el aviso de Mercado Pago, no con la vuelta).
+
+## Antiabuso y monitoreo (etapa 12)
+
+| Variable                | Obligatoria | Defecto | Descripción                                                                                                                   |
+| ----------------------- | ----------- | ------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `PASSWORD_BREACH_CHECK` | No          | `false` | Rechaza contraseñas filtradas (Have I Been Pwned; solo viajan 5 caracteres del SHA-1). Si el servicio no responde, deja pasar |
+| `TURNSTILE_SECRET_KEY`  | No          | —       | **Secreto** de Cloudflare Turnstile. Con él, CAPTCHA en registro, contacto y login tras 3 fallos por IP (`CAPTCHA_REQUIRED`)  |
+| `SENTRY_DSN`            | No          | —       | Reporta los errores 500 a Sentry sin datos personales. Sin él, apagado                                                        |
+
+El frontend necesita además la **clave pública** (site key) de Turnstile para mostrar el widget y
+mandar el token en `captchaToken`.
+
+Los backups (`ops/backup`) corren en un servicio aparte con sus propias variables: ver
+`docs/operacion.md`.
 
 ## Docker Compose (`.env`)
 

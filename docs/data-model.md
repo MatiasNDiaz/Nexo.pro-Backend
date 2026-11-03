@@ -230,6 +230,8 @@ Etapa 10 (ADR 0028): enums `content_status` (`VISIBLE`, `HIDDEN_BY_ADMIN`) y `fo
 
 Etapa 11 (ADR 0029): enums `report_target`, `report_reason`, `report_status`, `sanction_type`, `appeal_status`, `support_category` y `ticket_status`; `file_purpose` suma `EVIDENCE` (privado). La migración copió las suspensiones y baneos vigentes a `sanctions` (desde `users.status_reason`); desde ahora suspender, banear y restaurar escriben y cierran sanciones. Eventos auditados nuevos: `REPORT_UNDER_REVIEW`, `REPORT_RESOLVED`, `ADMIN_CHAT_ACCESSED`, `STRIKE_ADDED`, `STRIKE_VOIDED`, `SANCTION_APPLIED`, `SANCTION_LIFTED`, `SANCTION_EXPIRED` (sin actor: tarea horaria), `APPEAL_DECIDED`, `SUPPORT_REPLIED`, `SUPPORT_CLOSED`, `ANNOUNCEMENT_PUBLISHED` y `ADMIN_MESSAGE_SENT`.
 
+Etapa 12: índice `ix_auth_sessions_expires_at` (limpieza diaria) y `stored_files.storage_deleted_at` (cuándo se borró de verdad del almacenamiento; los DELETED sin fecha se reintentan cada hora, índice parcial `ix_stored_files_storage_pending`). `admin_audit_logs.ip_hash` se completa en los inicios de sesión. Eventos auditados nuevos: `LOGIN_SUCCEEDED` / `LOGIN_FAILED` (con la IP seudonimizada, sin el email) y `ADMIN_MFA_RESET`.
+
 Al anonimizar una cuenta, sus
 archivos pasan a `DELETED` y se borran del proveedor.
 
