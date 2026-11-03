@@ -39,6 +39,7 @@ import { ProfessionalProfession } from './entities/professional-profession.entit
 import { ProfessionalProfile } from './entities/professional-profile.entity';
 import { ProfessionalServiceArea } from './entities/professional-service-area.entity';
 import { ProfessionalSocialLink } from './entities/professional-social-link.entity';
+import { fitToLimit } from './plan-limits';
 import { CertStatus, MediaPurpose, MediaStatus, ProItemStatus } from './professional.enums';
 import { ProfessionalsService } from './professionals.service';
 import { type ProfileTheme, themeFieldsNotAllowed } from './profile-theme';
@@ -595,7 +596,176 @@ export class ProfileService {
     if (!result.affected) throw new NotFoundException();
   }
 
+  /**
+   * Ajusta lo visible al plan vigente cuando cambia (ADR 0026): al bajar, lo que excede pasa a
+   * HIDDEN_BY_PLAN, lo más reciente primero; al subir, vuelve lo oculto por el plan hasta el límite.
+   * Nada se borra y lo ocultado por el admin no se toca. Sin plan vigente no hace nada: el perfil
+   * entero deja de mostrarse.
+   */
+  async applyPlanLimits(userId: string): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      const profile = await manager.getRepository(ProfessionalProfile).findOne({
+        where: { userId, deactivatedAt: IsNull() },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const plan = profile && (await this.subscriptions.livePlan(userId, manager));
+      if (!profile || !plan) return;
+
+      const professions = manager.getRepository(ProfessionalProfession);
+      const links = await professions.find({
+        where: { professionalId: profile.id },
+        order: { createdAt: 'ASC' },
+      });
+      const fit = fitToLimit(
+        links,
+        plan.maxProfessions,
+        (link) => link.status === ProItemStatus.ACTIVE,
+        (link) => link.isPrimary,
+      );
+      for (const [items, status] of [
+        [fit.hide, ProItemStatus.HIDDEN_BY_PLAN],
+        [fit.show, ProItemStatus.ACTIVE],
+      ] as const) {
+        for (const link of items) {
+          await professions.update(
+            { professionalId: link.professionalId, professionId: link.professionId },
+            { status },
+          );
+        }
+      }
+
+      const media = (
+        await manager.getRepository(ProfessionalMedia).find({
+          where: { professionalId: profile.id, status: Not(MediaStatus.HIDDEN_BY_ADMIN) },
+          relations: { file: true },
+          order: { createdAt: 'ASC' },
+        })
+      ).filter((item) => item.purpose !== MediaPurpose.BANNER);
+      const fitsDuration = (item: ProfessionalMedia) =>
+        item.file?.kind !== FileKind.VIDEO ||
+        (item.file.durationMs ?? 0) <= plan.maxVideoSeconds * 1000 + 500;
+      const images = media.filter((item) => item.file?.kind !== FileKind.VIDEO);
+      const videos = media.filter((item) => item.file?.kind === FileKind.VIDEO);
+      const imageFit = fitToLimit(images, plan.maxImages, (m) => m.status === MediaStatus.ACTIVE);
+      const videoFit = fitToLimit(
+        videos.filter(fitsDuration),
+        plan.maxVideos,
+        (m) => m.status === MediaStatus.ACTIVE,
+      );
+      const tooLong = videos.filter((m) => !fitsDuration(m) && m.status === MediaStatus.ACTIVE);
+      await this.setMediaStatus(
+        manager,
+        [...imageFit.hide, ...videoFit.hide, ...tooLong],
+        MediaStatus.HIDDEN_BY_PLAN,
+      );
+      await this.setMediaStatus(manager, [...imageFit.show, ...videoFit.show], MediaStatus.ACTIVE);
+
+      const banners = await manager.getRepository(ProfessionalMedia).find({
+        where: {
+          professionalId: profile.id,
+          purpose: MediaPurpose.BANNER,
+          status: Not(MediaStatus.HIDDEN_BY_ADMIN),
+        },
+        relations: { file: true },
+      });
+      for (const banner of banners) {
+        const required =
+          banner.file?.kind === FileKind.VIDEO ? ThemeLevel.EXTENDED : ThemeLevel.STANDARD;
+        const allowed = themeLevelAtLeast(plan.themeLevel, required);
+        await this.setMediaStatus(
+          manager,
+          [banner],
+          allowed ? MediaStatus.ACTIVE : MediaStatus.HIDDEN_BY_PLAN,
+        );
+      }
+    });
+  }
+
+  /**
+   * El profesional elige qué imágenes y videos mostrar dentro del límite de su plan (ADR 0026). Lo
+   * que no elige queda oculto por el plan (no se borra). No cambia el banner ni lo ocultado por el
+   * admin.
+   */
+  async chooseVisibleMedia(userId: string, ids: string[]): Promise<ProfessionalMeDto> {
+    await this.dataSource.transaction(async (manager) => {
+      const profile = await this.ownProfile(manager, userId, true);
+      const plan = await this.requirePlan(manager, userId);
+      const media = await manager.getRepository(ProfessionalMedia).find({
+        where: {
+          professionalId: profile.id,
+          purpose: Not(MediaPurpose.BANNER),
+          status: Not(MediaStatus.HIDDEN_BY_ADMIN),
+        },
+        relations: { file: true },
+      });
+      const chosen = media.filter((item) => ids.includes(item.id));
+      if (chosen.length !== ids.length) {
+        throw new BadRequestException({
+          code: 'INVALID_MEDIA',
+          message: 'Elegí entre tus imágenes y videos (sin el banner ni lo ocultado por soporte).',
+        });
+      }
+      const videos = chosen.filter((item) => item.file?.kind === FileKind.VIDEO);
+      if (chosen.length - videos.length > plan.maxImages || videos.length > plan.maxVideos) {
+        throw planLimit(
+          `Tu plan permite mostrar hasta ${plan.maxImages} imágenes y ${plan.maxVideos} videos.`,
+        );
+      }
+      if (videos.some((item) => (item.file?.durationMs ?? 0) > plan.maxVideoSeconds * 1000 + 500)) {
+        throw planLimit(`Tu plan admite videos de hasta ${plan.maxVideoSeconds} segundos.`);
+      }
+      await this.setMediaStatus(manager, chosen, MediaStatus.ACTIVE);
+      await this.setMediaStatus(
+        manager,
+        media.filter((item) => !ids.includes(item.id)),
+        MediaStatus.HIDDEN_BY_PLAN,
+      );
+    });
+    return this.me(userId);
+  }
+
+  /** Lo mismo con las profesiones: la principal tiene que quedar visible. */
+  async chooseVisibleProfessions(userId: string, ids: string[]): Promise<ProfessionalMeDto> {
+    await this.dataSource.transaction(async (manager) => {
+      const profile = await this.ownProfile(manager, userId, true);
+      const plan = await this.requirePlan(manager, userId);
+      const repository = manager.getRepository(ProfessionalProfession);
+      const links = await repository.findBy({ professionalId: profile.id });
+      const chosen = links.filter((link) => ids.includes(link.professionId));
+      if (chosen.length !== ids.length || !chosen.some((link) => link.isPrimary)) {
+        throw new BadRequestException({
+          code: 'INVALID_PROFESSIONS',
+          message: 'Elegí entre tus profesiones, incluida la principal.',
+        });
+      }
+      if (chosen.length > plan.maxProfessions) {
+        throw planLimit(`Tu plan permite mostrar hasta ${plan.maxProfessions} profesiones.`);
+      }
+      for (const link of links) {
+        await repository.update(
+          { professionalId: link.professionalId, professionId: link.professionId },
+          {
+            status: ids.includes(link.professionId)
+              ? ProItemStatus.ACTIVE
+              : ProItemStatus.HIDDEN_BY_PLAN,
+          },
+        );
+      }
+    });
+    return this.me(userId);
+  }
+
   // ---------------------------------------------------------------------------------------------
+
+  private async setMediaStatus(
+    manager: EntityManager,
+    items: ProfessionalMedia[],
+    status: MediaStatus.ACTIVE | MediaStatus.HIDDEN_BY_PLAN,
+  ): Promise<void> {
+    const ids = items.filter((item) => item.status !== status).map((item) => item.id);
+    if (ids.length)
+      await manager.getRepository(ProfessionalMedia).update({ id: In(ids) }, { status });
+  }
 
   private async ownProfile(
     manager: EntityManager,

@@ -25,6 +25,9 @@ export const GOOGLE_PROVIDERS = ['disabled', 'google', 'fake'] as const;
 export type GoogleProviderName = (typeof GOOGLE_PROVIDERS)[number];
 export type IdentityProviderName = (typeof IDENTITY_PROVIDERS)[number];
 
+export const PAYMENTS_PROVIDERS = ['disabled', 'mercadopago', 'fake'] as const;
+export type PaymentsProviderName = (typeof PAYMENTS_PROVIDERS)[number];
+
 export const MAIL_PROVIDERS = ['console', 'memory'] as const;
 export type MailProviderName = (typeof MAIL_PROVIDERS)[number];
 
@@ -281,6 +284,28 @@ export class EnvironmentVariables {
   @Matches(/^https?:\/\/[a-z0-9.-]+(:\d{1,5})?\/\S*$/i)
   GOOGLE_CALLBACK_URL?: string;
 
+  // ---- Pagos (ADR 0026) ----
+
+  /** `disabled` (sin cobros), `mercadopago` o `fake` (simulado: prohibido en producción). */
+  @IsIn(PAYMENTS_PROVIDERS)
+  PAYMENTS_PROVIDER: PaymentsProviderName = 'disabled';
+
+  @IsOptional()
+  @IsString()
+  @MinLength(20)
+  MERCADOPAGO_ACCESS_TOKEN?: string;
+
+  /** Clave secreta de las notificaciones (valida la firma `x-signature`). ≥ 32 caracteres. */
+  @IsOptional()
+  @IsString()
+  @MinLength(32)
+  MERCADOPAGO_WEBHOOK_SECRET?: string;
+
+  /** URL pública de la API (sin prefijo), para armar la URL del webhook de pagos. */
+  @IsOptional()
+  @Matches(ORIGIN_PATTERN)
+  API_PUBLIC_URL?: string;
+
   /** Días que una cuenta dada de baja queda restaurable antes de anonimizarse (ADR 0016). */
   @Transform(toInt)
   @IsInt()
@@ -319,6 +344,14 @@ function providerRules(env: EnvironmentVariables): string[] {
   if (env.IDENTITY_PROVIDER === 'fake' && !env.FAKE_IDENTITY_WEBHOOK_SECRET) {
     problems.push('FAKE_IDENTITY_WEBHOOK_SECRET (obligatoria con IDENTITY_PROVIDER=fake)');
   }
+  if (env.PAYMENTS_PROVIDER === 'mercadopago' && !env.MERCADOPAGO_ACCESS_TOKEN) {
+    problems.push('MERCADOPAGO_ACCESS_TOKEN (obligatoria con PAYMENTS_PROVIDER=mercadopago)');
+  }
+  if (env.PAYMENTS_PROVIDER !== 'disabled') {
+    for (const name of ['MERCADOPAGO_WEBHOOK_SECRET', 'API_PUBLIC_URL'] as const) {
+      if (!env[name]) problems.push(`${name} (obligatoria con los pagos activados)`);
+    }
+  }
   return problems;
 }
 
@@ -338,6 +371,12 @@ function productionRules(env: EnvironmentVariables): string[] {
   }
   if (env.GOOGLE_CALLBACK_URL && !env.GOOGLE_CALLBACK_URL.startsWith('https://')) {
     problems.push('GOOGLE_CALLBACK_URL (en producción debe ser https)');
+  }
+  if (env.PAYMENTS_PROVIDER === 'fake') {
+    problems.push('PAYMENTS_PROVIDER (los pagos simulados están prohibidos en producción)');
+  }
+  if (env.API_PUBLIC_URL && !env.API_PUBLIC_URL.startsWith('https://')) {
+    problems.push('API_PUBLIC_URL (en producción debe ser https)');
   }
   if (env.SWAGGER_ENABLED) problems.push('SWAGGER_ENABLED (no se permite en producción)');
   if (env.FRONTEND_ORIGINS.some((origin) => !origin.startsWith('https://'))) {

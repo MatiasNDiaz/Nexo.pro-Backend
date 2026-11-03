@@ -15,12 +15,18 @@ export enum NotificationType {
   NEW_REQUEST = 'NEW_REQUEST',
   QUOTE = 'QUOTE',
   CONTRACT_UPDATED = 'CONTRACT_UPDATED',
+  /** Al profesional: pago aplicado, revertido o cambio de plan (ADR 0026). */
+  SUBSCRIPTION_UPDATED = 'SUBSCRIPTION_UPDATED',
+  /** Al admin: pago que no coincide, que no se pudo aplicar, reembolsado o desconocido. */
+  PAYMENT_ALERT = 'PAYMENT_ALERT',
 }
 
 export enum NotificationTarget {
   CONVERSATION = 'CONVERSATION',
   REQUEST = 'REQUEST',
   CONTRACT = 'CONTRACT',
+  SUBSCRIPTION = 'SUBSCRIPTION',
+  PAYMENT = 'PAYMENT',
 }
 
 /** Notificaciones dentro de la app (P-15). Los canales externos llegan en la etapa 13. */

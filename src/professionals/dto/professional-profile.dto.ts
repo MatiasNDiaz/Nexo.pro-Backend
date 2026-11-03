@@ -197,6 +197,29 @@ export class ReorderMediaDto {
   ids: string[];
 }
 
+/** Qué mostrar dentro del límite del plan (ADR 0026): lo que no se manda queda oculto. */
+export class VisibleMediaDto {
+  @ApiProperty({ type: [String], description: 'Ids de las imágenes y videos a mostrar' })
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  ids: string[];
+}
+
+export class VisibleProfessionsDto {
+  @ApiProperty({
+    type: [String],
+    description: 'Ids de las profesiones a mostrar (con la principal)',
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(20)
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  professionIds: string[];
+}
+
 export class AddCertificationDto {
   @ApiProperty({ format: 'uuid', description: 'Archivo CERTIFICATE propio, confirmado' })
   @IsUUID()

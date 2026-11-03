@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PaymentsModule } from './payments/payments.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { RequestsModule } from './requests/requests.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -27,6 +28,7 @@ import { validateEnv } from './config/env.validation';
 import { mailConfig } from './config/mail.config';
 import { securityConfig } from './config/security.config';
 import { googleConfig } from './config/google.config';
+import { paymentsConfig } from './config/payments.config';
 import { identityConfig, storageConfig } from './config/storage.config';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
@@ -57,6 +59,7 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
         storageConfig,
         identityConfig,
         googleConfig,
+        paymentsConfig,
       ],
       // Falla al iniciar si el entorno es inválido. Devuelve las variables crudas para que
       // @nestjs/config las copie a process.env (solo copia strings/números/booleanos, no listas);
@@ -99,10 +102,11 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
     NotificationsModule,
     ChatModule,
     RequestsModule,
+    PaymentsModule,
   ],
   providers: [
     // Guards globales, en este orden (plan §9.8). Denegación por defecto: solo `@Public()` pasa
-    // sin sesión. La etapa 9 agrega el de suscripción/plan al final.
+    // sin sesión. El plan vigente lo controla cada servicio (`livePlan`), no un guard.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: OriginGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },

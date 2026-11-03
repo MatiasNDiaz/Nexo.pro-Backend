@@ -35,6 +35,8 @@ import {
   ReplaceServiceAreasDto,
   ReplaceSocialLinksDto,
   UpdateProfessionalProfileDto,
+  VisibleMediaDto,
+  VisibleProfessionsDto,
 } from './dto/professional-profile.dto';
 import { ContentModerationService } from './content-moderation.service';
 import { ProfileService } from './profile.service';
@@ -116,6 +118,25 @@ export class ProfessionalsController {
     @Body() dto: ReorderMediaDto,
   ): Promise<ProfessionalMeDto> {
     return this.profiles.reorderMedia(user.id, dto.ids);
+  }
+
+  /** Al bajar de plan: qué imágenes y videos mostrar dentro del límite (ADR 0026). */
+  @Put('media/visible')
+  @ApiOkResponse({ type: ProfessionalMeDto })
+  chooseVisibleMedia(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: VisibleMediaDto,
+  ): Promise<ProfessionalMeDto> {
+    return this.profiles.chooseVisibleMedia(user.id, dto.ids);
+  }
+
+  @Put('professions/visible')
+  @ApiOkResponse({ type: ProfessionalMeDto })
+  chooseVisibleProfessions(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: VisibleProfessionsDto,
+  ): Promise<ProfessionalMeDto> {
+    return this.profiles.chooseVisibleProfessions(user.id, dto.professionIds);
   }
 
   @Delete('media/:id')

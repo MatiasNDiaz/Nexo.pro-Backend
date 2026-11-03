@@ -7,6 +7,7 @@ import {
   AdminProfessionalContentController,
   ProfessionalsController,
 } from './professionals.controller';
+import { PlanLimitsListener } from './plan-limits.listener';
 import { ProfessionalsService } from './professionals.service';
 import { ProfileService } from './profile.service';
 
@@ -14,7 +15,7 @@ import { ProfileService } from './profile.service';
 @Module({
   imports: [LocationsModule, SubscriptionsModule, UploadsModule],
   controllers: [ProfessionalsController, AdminProfessionalContentController],
-  providers: [ProfessionalsService, ProfileService, ContentModerationService],
+  providers: [ProfessionalsService, ProfileService, ContentModerationService, PlanLimitsListener],
   exports: [ProfessionalsService],
 })
 export class ProfessionalsModule {}
