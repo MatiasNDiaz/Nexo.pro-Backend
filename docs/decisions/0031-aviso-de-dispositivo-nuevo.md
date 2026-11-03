@@ -36,5 +36,5 @@ política de privacidad (revisión legal).
 de sesión; en la base va su HMAC (con `DATA_HMAC_KEY`), copiado en cada renovación de la sesión. Las
 sesiones anteriores a la 13.2 no tienen hash: el primer inicio de sesión de cada dispositivo después
 del deploy avisa una vez. El enlace pesa 70 caracteres (familia, cuenta y vencimiento en binario más
-128 bits de firma). Con Cloudflare delante hay dos proxies: `TRUST_PROXY=2` (pasos y riesgo en
-`docs/operacion.md`).
+128 bits de firma). Antes de producción solo se entra por Cloudflare (Cloudflare Tunnel, sin
+dominio público en Railway; decidido el 03/11/2026): pasos en `docs/operacion.md`.

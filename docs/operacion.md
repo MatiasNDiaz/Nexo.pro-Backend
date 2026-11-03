@@ -60,11 +60,22 @@ Opcional: sin esto, el email de dispositivo nuevo dice "ubicación no disponible
    `x-nexo-edge-secret` con un valor al azar de 32 caracteres o más. El mismo valor va en
    `CLOUDFLARE_EDGE_SECRET`. Sin ese encabezado la API ignora la ciudad (cualquiera puede inventar
    `cf-ipcity` llamando directo a Railway).
-4. **IP real:** con Cloudflare y Railway hay dos proxies, así que `TRUST_PROXY=2`; con `1` la API
-   vería la IP de Cloudflare y el límite por IP sería uno solo para todos. Con `2`, quien llame
-   directo a Railway (sin pasar por Cloudflare) puede inventar su IP: **probarlo en staging** y,
-   antes de producción, decidir si se bloquea el acceso directo (pendiente).
-5. Verificar: iniciar sesión desde otro navegador y revisar que el email traiga la ciudad.
+4. **Solo se entra por Cloudflare (decidido el 03/11/2026, obligatorio antes de producción).** Si
+   alguien llega directo a Railway salteando Cloudflare, puede inventar su IP (y con ella el límite
+   por IP y la auditoría). Forma recomendada:
+   - **Cloudflare Tunnel:** un servicio `cloudflared` dentro del proyecto de Railway que conecta
+     `api.<dominio>` con la API por la red privada (`<servicio>.railway.internal`). La API se queda
+     **sin dominio público** en Railway (ni `*.up.railway.app` ni dominio propio): no hay por dónde
+     entrar salteando Cloudflare.
+   - **Segunda capa en la API:** rechazar con 403 toda request sin `x-nexo-edge-secret` válido cuando
+     `CLOUDFLARE_EDGE_SECRET` está configurado (salvo `/health/live`, que usa Railway por dentro).
+     Se implementa antes de producción (pendiente).
+   - **`TRUST_PROXY`:** con el túnel, la API recibe la IP real de Cloudflare a través de `cloudflared`;
+     el valor exacto se fija **probándolo en staging** (los e2e de límite por IP y la auditoría deben
+     ver la IP del visitante, no la de Cloudflare ni la del túnel).
+   - El monitor de uptime consulta `https://api.<dominio>/...`, así que también pasa por Cloudflare.
+5. Verificar: iniciar sesión desde otro navegador y revisar que el email traiga la ciudad; y que una
+   request directa a Railway (si quedó algún dominio público) responda 403.
 
 ### Volver atrás un deploy
 
