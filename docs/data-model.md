@@ -236,6 +236,8 @@ Etapa 13.1 (ADR 0030): enum `payment_kind` (`NEW`, `RENEWAL`, `REACTIVATION`, `U
 
 Etapa 13.2 (ADR 0031): `auth_sessions.device_hash` (HMAC de la cookie `nx_device`; se copia en cada rotación de la familia). Las sesiones anteriores quedan sin hash. La ciudad aproximada no se guarda. Evento auditado nuevo: `SESSION_CLOSED_FROM_EMAIL` (familia y si estaba abierta, con la IP seudonimizada).
 
+Etapa 13.3 (ADR 0032): `push_subscriptions` (un navegador por fila: `endpoint` único y solo de servicios de push conocidos, claves del navegador, cuenta y familia de sesión; se borra con la cuenta, a las 5 fallas seguidas, cuando el servicio dice que no existe y en la limpieza diaria si el dispositivo ya no tiene sesión) y `notification_preferences` (clave cuenta + categoría; sin fila, push activado), con el enum `notification_category`. La categoría de cada tipo de notificación vive en el código (`src/notifications/notification-categories.ts`).
+
 Al anonimizar una cuenta, sus
 archivos pasan a `DELETED` y se borran del proveedor.
 

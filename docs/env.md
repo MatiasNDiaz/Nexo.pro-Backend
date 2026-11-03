@@ -114,6 +114,17 @@ mandar el token en `captchaToken`.
 Los backups (`ops/backup`) corren en un servicio aparte con sus propias variables: ver
 `docs/operacion.md`.
 
+## Notificaciones push (etapa 13.3, ADR 0032)
+
+| Variable            | Obligatoria   | Defecto    | Descripción                                                                             |
+| ------------------- | ------------- | ---------- | --------------------------------------------------------------------------------------- |
+| `PUSH_PROVIDER`     | No            | `disabled` | `disabled`, `webpush` o `fake` (solo tests; prohibido en producción)                    |
+| `VAPID_PUBLIC_KEY`  | Con `webpush` | —          | Clave pública (`npm run push:keys`). La API se la da al navegador                       |
+| `VAPID_PRIVATE_KEY` | Con `webpush` | —          | **Secreta.** Cambiarla invalida todas las suscripciones: generarla una vez por ambiente |
+| `VAPID_SUBJECT`     | Con `webpush` | —          | Contacto para los servicios de push: `mailto:soporte@<dominio>` o una URL https         |
+
+Guía para el frontend (service worker, permisos, iPhone): `docs/push.md`.
+
 ## Docker Compose (`.env`)
 
 | Variable                | Defecto         | Descripción                                                       |

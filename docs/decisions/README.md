@@ -37,4 +37,6 @@ Formato: contexto, decisión, consecuencias, fecha. Para cambiar una decisión s
 | [0030](0030-panel-de-ingresos.md)                       | Panel de ingresos del admin: 4 tipos de pago, neto con criterio de caja, CSV de pagos con email y de registros sin email, auditado    |
 | [0031](0031-aviso-de-dispositivo-nuevo.md)              | Email por dispositivo nuevo: cookie propia, ciudad de Cloudflare sin guardarla, cierre de esa sesión con un `POST` desde el enlace    |
 
+| [0032](0032-notificaciones-push.md) | Push web con `web-push`: mismo texto que en la plataforma, nunca el mensaje; sin push con la app abierta; categorías que se apagan |
+
 Las decisiones todavía abiertas están en [pendientes.md](pendientes.md).

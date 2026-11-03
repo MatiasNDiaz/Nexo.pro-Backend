@@ -38,7 +38,9 @@ DELETE ON TABLES` y `USAGE, SELECT ON SEQUENCES` para las tablas que creen las m
    - `NODE_ENV=production`, `TRUST_PROXY=1`, `COOKIE_SECURE=true`, `SWAGGER_ENABLED=false`;
    - las claves (`JWT_ACCESS_SECRET`, `CSRF_SECRET`, `DATA_ENCRYPTION_KEY`, `DATA_HMAC_KEY`)
      generadas al azar, **distintas de las de staging**;
-   - las de cada proveedor (ver `env.md`). La API no arranca si falta algo obligatorio.
+   - las de cada proveedor (ver `env.md`). La API no arranca si falta algo obligatorio;
+   - las claves de push, generadas una sola vez por ambiente con `npm run push:keys`
+     (`PUSH_PROVIDER=webpush`; cambiar la privada después obliga a todos a reactivar los avisos).
 4. **Migraciones como paso del deploy** (no al arrancar la app). En el servicio de la API,
    comando previo al deploy (_pre-deploy command_):
    `npx typeorm migration:run -d dist/database/data-source.js`
