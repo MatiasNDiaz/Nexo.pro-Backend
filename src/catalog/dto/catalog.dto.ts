@@ -71,6 +71,12 @@ export class PublicAreaDto {
 
 export class CatalogItemDto {
   @ApiProperty() slug: string;
+  @ApiProperty({
+    format: 'uuid',
+    description:
+      'Id de usuario del profesional: el que piden chat, favoritos, solicitudes y reportes de perfil',
+  })
+  professionalUserId: string;
   @ApiProperty() firstName: string;
   @ApiProperty() lastName: string;
   @ApiProperty({ nullable: true, type: String }) businessName: string | null;

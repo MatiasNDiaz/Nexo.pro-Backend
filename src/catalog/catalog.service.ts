@@ -373,6 +373,7 @@ export class CatalogService {
       };
       return {
         slug: row.slug,
+        professionalUserId: row.user_id,
         firstName: row.first_name,
         lastName: row.last_name,
         businessName: row.business_name,

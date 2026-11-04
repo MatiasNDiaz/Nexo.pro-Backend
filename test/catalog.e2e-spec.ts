@@ -5,7 +5,13 @@ import { SubscriptionPlan } from '../src/subscriptions/entities/subscription-pla
 import { Subscription } from '../src/subscriptions/entities/subscription.entity';
 import { User } from '../src/users/entities/user.entity';
 import { AccountStatus, VerificationStatus } from '../src/users/user.enums';
-import { Client, cordobaLocalityId, signInAdmin, signInProfessional } from './utils/auth-client';
+import {
+  Client,
+  cordobaLocalityId,
+  signInAdmin,
+  signInCustomer,
+  signInProfessional,
+} from './utils/auth-client';
 import { createTestApp } from './utils/create-test-app';
 import { PDF_BYTES, PNG_BYTES, uploadAvatar, uploadFile } from './utils/uploads';
 
@@ -194,6 +200,27 @@ describe('Catálogo público (e2e)', () => {
     expect(slugsOf((await search('&limit=50')).body, [wholeLocality])).toEqual([
       wholeLocality.slug,
     ]);
+  });
+
+  it('lista y detalle traen el id de usuario del profesional, el que aceptan chat y favoritos (H-01)', async () => {
+    const pro = await listed();
+    const item = (
+      (await search('&limit=50')).body.data as Array<{ slug: string; professionalUserId: string }>
+    ).find((i) => i.slug === pro.slug);
+    expect(item?.professionalUserId).toBe(pro.id);
+    const detail = await new Client(app).get(`/catalog/professionals/${pro.slug}`);
+    expect(detail.body.professionalUserId).toBe(pro.id);
+
+    // Con ese id, un cliente puede iniciar el contacto desde el catálogo.
+    const customer = await signInCustomer(app);
+    const chat = await customer.client.post('/chat/conversations', {
+      professionalId: detail.body.professionalUserId,
+    });
+    expect([200, 201]).toContain(chat.status);
+    const favorite = await customer.client.put(
+      `/favorites/${detail.body.professionalUserId as string}`,
+    );
+    expect(favorite.status).toBeLessThan(300);
   });
 
   it('detalle público: contacto, contenido según el plan, certificados no verificados y nombre aprobado', async () => {
