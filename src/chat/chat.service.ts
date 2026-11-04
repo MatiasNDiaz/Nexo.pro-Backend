@@ -153,6 +153,8 @@ export class ChatService {
     const { conversation, role } = await this.participation(user, conversationId);
     if (role === 'CUSTOMER') {
       await this.assertProfessionalCanReply(conversation.professionalId, conversation.customerId);
+    } else {
+      await this.assertCustomerCanReceive(conversation.customerId);
     }
 
     const created: Notification[] = [];
@@ -377,6 +379,20 @@ export class ChatService {
     }
   }
 
+  /** El profesional no le escribe a un cliente que dio de baja su cuenta: nadie lo leería. */
+  private async assertCustomerCanReceive(customerId: string): Promise<void> {
+    // Anonimizada, la cuenta está borrada: sin withDeleted no aparecería.
+    const customer = await this.dataSource
+      .getRepository(User)
+      .findOne({ where: { id: customerId }, withDeleted: true });
+    if (!customer || customer.status === AccountStatus.DEACTIVATED) {
+      throw new ConflictException({
+        code: 'CUSTOMER_UNAVAILABLE',
+        message: 'El cliente dio de baja su cuenta. Podés leer la conversación.',
+      });
+    }
+  }
+
   private async ownMessage(user: AuthUser, messageId: string) {
     const message = await this.dataSource.getRepository(Message).findOneBy({ id: messageId });
     if (!message || message.senderId !== user.id || message.deletedAt) {
@@ -438,7 +454,8 @@ export class ChatService {
     const myReadAt = myRole === 'CUSTOMER' ? c.customerLastReadAt : c.professionalLastReadAt;
     const manager = this.dataSource.manager;
     const [other, last, unread] = await Promise.all([
-      manager.getRepository(User).findOneByOrFail({ id: otherId }),
+      // La otra parte puede estar anonimizada (H-02): se muestra como «Cuenta eliminada».
+      manager.getRepository(User).findOneOrFail({ where: { id: otherId }, withDeleted: true }),
       manager.getRepository(Message).findOne({
         where: { conversationId: c.id },
         order: { createdAt: 'DESC' },
@@ -452,17 +469,20 @@ export class ChatService {
         .getCount(),
     ]);
     const { avatarUrl } = await this.uploads.avatarUrls(other);
+    const deactivated = other.status === AccountStatus.DEACTIVATED;
     const counterpart: CounterpartDto = {
       userId: other.id,
       firstName: other.firstName,
       lastName: other.lastName,
       avatarUrl,
+      deactivated,
     };
     if (myRole === 'CUSTOMER') {
       const profile = await manager
         .getRepository(ProfessionalProfile)
         .findOneBy({ userId: other.id });
-      counterpart.slug = profile?.slug ?? null;
+      // Dado de baja, su perfil ya no se publica: no hay a dónde enlazar.
+      counterpart.slug = deactivated ? null : (profile?.slug ?? null);
       counterpart.businessName = profile?.businessName ?? null;
     } else {
       // C-13: el profesional ve el barrio y los datos útiles del cliente que le escribió.
@@ -476,11 +496,12 @@ export class ChatService {
       counterpart.extraInfo = customerProfile?.extraInfo ?? null;
     }
     const canWrite =
-      myRole === 'PROFESSIONAL' ||
-      (await this.assertProfessionalCanReply(c.professionalId, c.customerId).then(
-        () => true,
-        () => false,
-      ));
+      myRole === 'PROFESSIONAL'
+        ? !deactivated
+        : await this.assertProfessionalCanReply(c.professionalId, c.customerId).then(
+            () => true,
+            () => false,
+          );
     return {
       id: c.id,
       myRole,

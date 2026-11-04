@@ -220,7 +220,10 @@ export class SanctionsService {
         message: 'La sanción ya está levantada.',
       });
     }
-    const user = await this.dataSource.getRepository(User).findOneByOrFail({ id: sanction.userId });
+    // La cuenta puede estar anonimizada (H-13): la sanción se levanta igual y queda auditada.
+    const user = await this.dataSource
+      .getRepository(User)
+      .findOneOrFail({ where: { id: sanction.userId }, withDeleted: true });
     const accountSanction =
       sanction.type === SanctionType.SUSPENSION || sanction.type === SanctionType.BAN;
     if (

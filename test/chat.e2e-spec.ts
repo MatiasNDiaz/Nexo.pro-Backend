@@ -4,6 +4,8 @@ import { DataSource, IsNull } from 'typeorm';
 import { Message } from '../src/chat/entities/chat.entities';
 import { Notification } from '../src/notifications/entities/notification.entity';
 import { Subscription } from '../src/subscriptions/entities/subscription.entity';
+import { anonymizeAccount } from '../src/users/account-anonymizer';
+import { User } from '../src/users/entities/user.entity';
 import { AccountStatus } from '../src/users/user.enums';
 import { Client, signInCustomer, signInProfessional } from './utils/auth-client';
 import { createTestApp } from './utils/create-test-app';
@@ -176,6 +178,85 @@ describe('Chat (e2e)', () => {
     expect((await send(customer.client, conversationId, { attachmentIds: [fileId] })).status).toBe(
       409,
     );
+  });
+
+  describe('la otra parte dio de baja su cuenta (H-02)', () => {
+    const find = (list: unknown, id: string) =>
+      (list as Array<{ id: string }>).find((c) => c.id === id);
+
+    it('cliente anonimizado: el profesional sigue viendo el chat, de solo lectura', async () => {
+      const { pro, customer, conversationId } = await pair();
+      await send(customer.client, conversationId, { body: 'Hola, ¿podés venir?' });
+      await dataSource.transaction((manager) => anonymizeAccount(manager, customer.id));
+
+      const list = await pro.client.get('/chat/conversations');
+      expect(list.status).toBe(200);
+      expect(find(list.body, conversationId)).toMatchObject({
+        canWrite: false,
+        counterpart: {
+          firstName: 'Cuenta',
+          lastName: 'eliminada',
+          avatarUrl: null,
+          deactivated: true,
+          neighborhoodName: null,
+          extraInfo: null,
+        },
+        lastMessage: { body: 'Hola, ¿podés venir?' },
+      });
+      expect((await pro.client.get(`/chat/conversations/${conversationId}`)).status).toBe(200);
+      expect((await pro.client.get(`/chat/conversations/${conversationId}/messages`)).status).toBe(
+        200,
+      );
+      const write = await send(pro.client, conversationId, { body: '¿Seguís ahí?' });
+      expect(write.status).toBe(409);
+      expect(write.body.code).toBe('CUSTOMER_UNAVAILABLE');
+    });
+
+    it('cliente en los 30 días de arrepentimiento: tampoco se le escribe', async () => {
+      const { pro, customer, conversationId } = await pair();
+      await dataSource
+        .getRepository(User)
+        .update(customer.id, { status: AccountStatus.DEACTIVATED });
+
+      const conversation = await pro.client.get(`/chat/conversations/${conversationId}`);
+      expect(conversation.body).toMatchObject({
+        canWrite: false,
+        counterpart: { firstName: 'Ana', deactivated: true },
+      });
+      expect((await send(pro.client, conversationId, { body: 'hola' })).body.code).toBe(
+        'CUSTOMER_UNAVAILABLE',
+      );
+    });
+
+    it('profesional anonimizado: el cliente ve el chat sin enlace al perfil y no escribe', async () => {
+      const { pro, customer, conversationId } = await pair();
+      await dataSource.transaction((manager) => anonymizeAccount(manager, pro.id));
+
+      const list = await customer.client.get('/chat/conversations');
+      expect(list.status).toBe(200);
+      expect(find(list.body, conversationId)).toMatchObject({
+        canWrite: false,
+        counterpart: { firstName: 'Cuenta', deactivated: true, slug: null, businessName: null },
+      });
+      // Volver a abrirlo desde el perfil (o un enlace viejo) devuelve el mismo chat.
+      const reopened = await customer.client.post('/chat/conversations', {
+        professionalId: pro.id,
+      });
+      expect(reopened.status).toBeLessThan(300);
+      expect(reopened.body.id).toBe(conversationId);
+      const write = await send(customer.client, conversationId, { body: 'hola' });
+      expect(write.status).toBe(409);
+      expect(write.body.code).toBe('PROFESSIONAL_UNAVAILABLE');
+    });
+
+    it('con la otra parte activa, nada cambia', async () => {
+      const { pro, customer, conversationId } = await pair();
+      const mine = await customer.client.get(`/chat/conversations/${conversationId}`);
+      expect(mine.body).toMatchObject({ canWrite: true, counterpart: { deactivated: false } });
+      expect(mine.body.counterpart.slug).toEqual(expect.any(String));
+      const theirs = await pro.client.get(`/chat/conversations/${conversationId}`);
+      expect(theirs.body).toMatchObject({ canWrite: true, counterpart: { deactivated: false } });
+    });
   });
 
   it('profesional sin prueba ni plan: no usa el chat; el cliente lee pero no escribe', async () => {

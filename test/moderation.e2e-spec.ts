@@ -4,6 +4,7 @@ import { AdminAuditLog } from '../src/audit/entities/admin-audit-log.entity';
 import { Sanction } from '../src/moderation/entities/moderation.entities';
 import { SanctionsService } from '../src/moderation/sanctions.service';
 import { Notification, NotificationType } from '../src/notifications/entities/notification.entity';
+import { anonymizeAccount } from '../src/users/account-anonymizer';
 import { User } from '../src/users/entities/user.entity';
 import { AccountStatus, VerificationStatus } from '../src/users/user.enums';
 import { Client, mailbox, signInAdmin, signInCustomer } from './utils/auth-client';
@@ -195,6 +196,27 @@ describe('Moderación, soporte y panel del admin (e2e)', () => {
       expect(mine.sanctions).toEqual([expect.objectContaining({ type: 'WARNING', active: true })]);
       expect(await count(customer.id, NotificationType.MODERATION_ACTION)).toBe(2);
       expect(await statusOf(customer.id)).toBe(AccountStatus.ACTIVE);
+    });
+
+    it('se puede levantar la sanción de una cuenta ya anonimizada y queda auditado (H-13)', async () => {
+      const customer = await signInCustomer(app);
+      const warning = await admin.post(`/admin/users/${customer.id}/sanctions`, {
+        type: 'WARNING',
+        reason: 'Advertencia por el lenguaje',
+      });
+      await dataSource.transaction((manager) => anonymizeAccount(manager, customer.id));
+
+      const lifted = await admin.post(`/admin/sanctions/${warning.body.id}/lift`, {
+        reason: 'Ya no corresponde',
+      });
+      expect(lifted.status).toBe(200);
+      expect(lifted.body).toMatchObject({ id: warning.body.id, active: false });
+      expect(await audited('SANCTION_LIFTED', customer.id)).toBe(1);
+      // La cuenta sigue dada de baja: levantar la sanción no la reactiva.
+      const stored = await dataSource
+        .getRepository(User)
+        .findOneOrFail({ where: { id: customer.id }, withDeleted: true });
+      expect(stored.status).toBe(AccountStatus.DEACTIVATED);
     });
 
     it('perfil oculto (C-29): la cuenta sigue y el perfil sale del catálogo', async () => {

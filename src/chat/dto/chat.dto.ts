@@ -94,7 +94,17 @@ export class CounterpartDto {
   @ApiProperty() firstName: string;
   @ApiProperty() lastName: string;
   @ApiProperty({ nullable: true, type: String }) avatarUrl: string | null;
-  @ApiPropertyOptional({ description: 'Solo si es profesional' }) slug?: string | null;
+  @ApiProperty({
+    description:
+      'true si dio de baja su cuenta: el chat queda de solo lectura. Anonimizada, se llama «Cuenta eliminada»',
+  })
+  deactivated: boolean;
+  @ApiPropertyOptional({
+    description: 'Solo si es profesional; null si dio de baja su cuenta',
+    nullable: true,
+    type: String,
+  })
+  slug?: string | null;
   @ApiPropertyOptional({ nullable: true, type: String }) businessName?: string | null;
   @ApiPropertyOptional({ description: 'Solo si es cliente (C-13)' }) neighborhoodName?:
     string | null;
@@ -109,7 +119,10 @@ export class ConversationDto {
   @ApiProperty() unread: number;
   @ApiProperty({ nullable: true, type: Date, description: 'Hasta dónde leyó el otro' })
   counterpartReadAt: Date | null;
-  @ApiProperty({ description: 'false si no se pueden mandar mensajes (profesional sin plan)' })
+  @ApiProperty({
+    description:
+      'false si no se pueden mandar mensajes (profesional sin plan o cuenta dada de baja)',
+  })
   canWrite: boolean;
   @ApiProperty({ nullable: true, type: Date }) lastMessageAt: Date | null;
 }
