@@ -89,7 +89,10 @@ describe('Moderación, soporte y panel del admin (e2e)', () => {
       expect(await count(pro.id, NotificationType.REPORT_UPHELD)).toBe(0);
 
       // Fotos privadas: el autor y el admin sí, el denunciado no.
-      expect((await customer.client.get(`/evidence/${fileId}`)).status).toBe(200);
+      const own = await customer.client.get(`/evidence/${fileId}`);
+      expect(own.status).toBe(200);
+      expect(own.headers['cross-origin-resource-policy']).toBe('same-site');
+      expect(own.headers['cache-control']).toBe('private, no-store');
       expect((await admin.get(`/evidence/${fileId}`)).status).toBe(200);
       expect((await pro.client.get(`/evidence/${fileId}`)).status).toBe(403);
 

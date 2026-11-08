@@ -24,6 +24,7 @@ import { DataSource } from 'typeorm';
 import { AllowAccountStates, type AuthUser, CurrentUser, Roles } from '../common/decorators';
 import { StoredFile } from '../uploads/entities/stored-file.entity';
 import { FilePurpose } from '../uploads/file.enums';
+import { sendPrivateContent } from '../uploads/private-content';
 import { UploadsService } from '../uploads/uploads.service';
 import { UserRole } from '../users/user.enums';
 import {
@@ -122,15 +123,7 @@ export class EvidenceController {
     if (file.ownerUserId !== user.id && user.role !== UserRole.ADMIN) {
       throw new ForbiddenException();
     }
-    const content = await this.uploads.privateContent(file);
-    if ('redirectUrl' in content) {
-      res.redirect(302, content.redirectUrl);
-      return;
-    }
-    res
-      .status(200)
-      .set({ 'Content-Type': content.mimeType, 'Cache-Control': 'private, no-store' })
-      .send(content.data);
+    sendPrivateContent(res, await this.uploads.privateContent(file));
   }
 }
 

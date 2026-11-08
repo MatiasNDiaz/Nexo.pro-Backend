@@ -21,6 +21,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { type AuthUser, CurrentUser, Roles } from '../common/decorators';
+import { sendPrivateContent } from '../uploads/private-content';
 import { ChatService } from './chat.service';
 import {
   ConversationDto,
@@ -118,14 +119,6 @@ export class ChatController {
     @Param('fileId', ParseUUIDPipe) fileId: string,
     @Res() res: Response,
   ): Promise<void> {
-    const content = await this.chat.attachment(user, fileId);
-    if ('redirectUrl' in content) {
-      res.redirect(302, content.redirectUrl);
-      return;
-    }
-    res
-      .status(200)
-      .set({ 'Content-Type': content.mimeType, 'Cache-Control': 'private, no-store' })
-      .send(content.data);
+    sendPrivateContent(res, await this.chat.attachment(user, fileId));
   }
 }

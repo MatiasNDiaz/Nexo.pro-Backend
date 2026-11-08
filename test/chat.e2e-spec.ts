@@ -170,6 +170,8 @@ describe('Chat (e2e)', () => {
     expect(seen.status).toBe(200);
     expect(seen.headers['content-type']).toBe('image/png');
     expect(seen.headers['cache-control']).toBe('private, no-store');
+    // H-14: el frontend (otro origen del mismo sitio) lo puede mostrar; otros sitios no.
+    expect(seen.headers['cross-origin-resource-policy']).toBe('same-site');
 
     const stranger = await signInCustomer(app);
     expect((await stranger.client.get(`/chat/attachments/${fileId}`)).status).toBe(404);
