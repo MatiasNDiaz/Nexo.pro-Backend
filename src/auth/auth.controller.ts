@@ -140,6 +140,7 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(200)
   @Throttle({ default: { limit: 30, ttl: MINUTE } })
+  @ApiOkResponse({ type: CsrfTokenDto })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
