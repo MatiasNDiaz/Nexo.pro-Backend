@@ -184,7 +184,8 @@ cuenta tiene contraseña.
 4. **Token CSRF firmado** en métodos no seguros con sesión: `HMAC(CSRF_SECRET, dispositivo + valor de
 la cookie nx_csrf)`. Llega en el body del login, del refresh y de `GET /auth/csrf`. El frontend lo
    guarda **en memoria** y lo manda en `X-CSRF-Token`. Está ligado al dispositivo (no cambia en cada
-   refresh) y no sirve para otra sesión.
+   refresh) y no sirve para otra sesión. Sin sesión, `GET /auth/csrf` responde `200 { csrfToken: null }`
+   (etapa 18): es la pregunta "¿hay sesión?" de cada visita y un 401 ensuciaba la consola.
 5. Login, registro y verificación de email (sin sesión) quedan protegidos por 1–3 y el rate limit.
 
 `HttpOnly` no impide CSRF ni XSS: un script inyectado no lee las cookies, pero puede hacer requests
@@ -230,7 +231,8 @@ function refreshOnce(): Promise<boolean> {
 /** Tras recargar la página el token se perdió: se pide de nuevo (usa la cookie de refresh). */
 export async function loadCsrf(): Promise<void> {
   const res = await raw('/auth/csrf');
-  if (res.ok) setCsrfToken((await res.json()).csrfToken);
+  const token = res.ok ? (await res.json()).csrfToken : null; // null = no hay sesión
+  if (token) setCsrfToken(token);
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {

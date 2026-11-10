@@ -75,6 +75,14 @@ export class CsrfTokenDto {
   @ApiProperty() csrfToken: string;
 }
 
+/**
+ * `GET /auth/csrf`: null = no hay sesión en este navegador. Es una respuesta normal (200), no un
+ * error: es lo que pasa en cada visita sin sesión, y un 401 ensuciaba la consola del navegador.
+ */
+export class SessionCsrfDto {
+  @ApiProperty({ type: String, nullable: true }) csrfToken: string | null;
+}
+
 export class MessageDto {
   @ApiProperty() message: string;
 }

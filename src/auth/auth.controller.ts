@@ -27,6 +27,7 @@ import {
 } from './dto/auth-requests.dto';
 import {
   CsrfTokenDto,
+  SessionCsrfDto,
   CurrentUserDto,
   MeDto,
   MessageDto,
@@ -218,18 +219,18 @@ export class AuthController {
   /**
    * Token CSRF para un frontend recién recargado (lo tenía solo en memoria). Funciona con la cookie
    * de refresh, así sirve aunque el access haya vencido. CORS impide que otro sitio lea la respuesta.
+   * Sin sesión responde `{ csrfToken: null }` (200): el frontend lo pregunta en cada visita.
    */
   @Public()
   @Get('csrf')
-  @ApiOkResponse({ type: CsrfTokenDto })
+  @ApiOkResponse({ type: SessionCsrfDto })
   async csrfToken(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<CsrfTokenDto> {
+  ): Promise<SessionCsrfDto> {
     const refreshToken = this.cookies.read(req, 'refresh');
     const family = refreshToken ? await this.sessions.activeFamilyOf(refreshToken) : null;
-    if (!family)
-      throw new UnauthorizedException({ code: 'UNAUTHORIZED', message: 'Iniciá sesión.' });
+    if (!family) return { csrfToken: null };
     return { csrfToken: this.csrfTokenFor(req, res, family) };
   }
 

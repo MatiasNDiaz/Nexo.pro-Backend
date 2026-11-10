@@ -313,7 +313,21 @@ describe('Autenticación con cookies (e2e)', () => {
       const res = await client.get('/auth/csrf');
       expect(res.status).toBe(200);
       expect(res.body.csrfToken).toBe(client.csrfToken);
-      expect((await new Client(app).get('/auth/csrf')).status).toBe(401);
+    });
+
+    it('GET /auth/csrf sin sesión responde 200 con null (no es un error) y no pone cookies', async () => {
+      const res = await new Client(app).get('/auth/csrf');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ csrfToken: null });
+      expect(res.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('GET /auth/csrf después de cerrar sesión ya no entrega token', async () => {
+      const { client } = await signedIn();
+      expect((await client.post('/auth/logout')).status).toBeLessThan(300);
+      const res = await client.get('/auth/csrf');
+      expect(res.status).toBe(200);
+      expect(res.body.csrfToken).toBeNull();
     });
   });
 
