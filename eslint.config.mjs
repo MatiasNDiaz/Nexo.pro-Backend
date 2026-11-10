@@ -27,6 +27,13 @@ export default tseslint.config(
     },
   },
   {
+    // `scripts/`: comandos de terminal en JavaScript (npm run check:…). Sin chequeo de tipos (no son
+    // parte del proyecto de TypeScript) y con salida por consola, que es su interfaz.
+    files: ['scripts/**/*.mjs'],
+    ...tseslint.configs.disableTypeChecked,
+    rules: { ...tseslint.configs.disableTypeChecked.rules, 'no-console': 'off' },
+  },
+  {
     // Supertest y los mocks de Jest devuelven `any` por diseño.
     files: ['**/*.spec.ts', 'test/**/*.ts'],
     rules: {
