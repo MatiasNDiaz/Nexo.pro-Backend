@@ -30,7 +30,8 @@
     "admin:create": "npm run build && node dist/auth/cli/create-admin.js",
     "admin:reset-mfa": "npm run build && node dist/auth/cli/reset-admin-mfa.js",
     "accounts:purge": "npm run build && node dist/users/cli/purge-deleted-accounts.js",
-    "push:keys": "web-push generate-vapid-keys --json"
+    "push:keys": "web-push generate-vapid-keys --json",
+    "check:cloudinary": "node scripts/check-cloudinary.mjs"
   },
   "dependencies": {
     "@nestjs/common": "12.3.2",
