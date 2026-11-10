@@ -3,7 +3,7 @@
 - **Fecha:** 10/11/2026 · **Estado:** implementada (etapa 17) · **Amplía:** ADR 0018
 
 **Contexto.** Al principio se pensó en usar la cuenta de Cloudinary de otro proyecto del fundador
-(CercaTrova). Como el plan gratis permite un solo *product environment* y una clave de esa cuenta
+(CercaTrova). Como el plan gratis permite un solo _product environment_ y una clave de esa cuenta
 habría podido tocar archivos de CercaTrova, **Repara Ya tiene su propia cuenta de Cloudinary**,
 totalmente separada (otro correo, otro cloud name, sus propias claves). Además, al pasar el entorno
 local de disco a Cloudinary, todos los archivos ya guardados en disco dejaban de verse: el backend
