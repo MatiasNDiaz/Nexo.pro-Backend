@@ -114,7 +114,23 @@ describe('validateEnv', () => {
       FRONTEND_URL: 'https://app.example.com',
       COOKIE_SECURE: 'true',
       TRUST_PROXY: '1',
+      CLOUDINARY_FOLDER: 'repara-ya/prod',
     };
+
+    it('nunca escribe en la carpeta de desarrollo o de pruebas de Cloudinary (ADR 0036)', () => {
+      for (const folder of ['repara-ya/dev', 'repara-ya-dev', 'nexo-test', 'repara-ya/test']) {
+        expect(() => validateEnv({ ...prod, CLOUDINARY_FOLDER: folder })).toThrow(
+          /CLOUDINARY_FOLDER/,
+        );
+      }
+      let message = '';
+      try {
+        validateEnv({ ...prod, CLOUDINARY_FOLDER: 'repara-ya/prod' });
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).not.toMatch(/CLOUDINARY_FOLDER/);
+    });
 
     it('exige confiar en el proxy (límite por IP real detrás de Railway)', () => {
       expect(() => validateEnv({ ...prod, TRUST_PROXY: '0' })).toThrow(/TRUST_PROXY/);
@@ -218,6 +234,18 @@ describe('validateEnv', () => {
           CLOUDINARY_API_SECRET: 'secreto-largo-de-prueba',
         }).STORAGE_PROVIDER,
       ).toBe('cloudinary');
+    });
+
+    it('carpeta de Cloudinary: por defecto repara-ya/dev; admite subcarpetas, no rutas raras', () => {
+      expect(validateEnv(base).CLOUDINARY_FOLDER).toBe('repara-ya/dev');
+      expect(validateEnv({ ...base, CLOUDINARY_FOLDER: 'repara-ya/prod' }).CLOUDINARY_FOLDER).toBe(
+        'repara-ya/prod',
+      );
+      for (const folder of ['/repara-ya', 'repara-ya/', 'repara-ya//dev', '../otro', 'Repara Ya']) {
+        expect(() => validateEnv({ ...base, CLOUDINARY_FOLDER: folder })).toThrow(
+          /CLOUDINARY_FOLDER/,
+        );
+      }
     });
 
     it('login con Google: apagado por defecto; activado exige credenciales y callback', () => {

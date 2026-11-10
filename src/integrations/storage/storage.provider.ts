@@ -64,5 +64,19 @@ export interface StorageProvider {
   privateUrl(storageKey: string, kind: FileKind, mimeType: string, ttlSec: number): string | null;
 }
 
+/**
+ * Los proveedores de este ambiente (ADR 0036). `active` recibe los archivos nuevos; cada archivo que
+ * ya existe se atiende con el proveedor que quedó en su fila (`stored_files.provider`): pasar de disco
+ * a Cloudinary no rompe los archivos viejos. Fuera de producción, el de disco queda disponible para
+ * los archivos que ya están ahí; Cloudinary, solo si tiene credenciales.
+ */
+export const STORAGE_REGISTRY = Symbol('STORAGE_REGISTRY');
+
+export interface StorageRegistry {
+  readonly active: StorageProvider;
+  /** El proveedor de un archivo existente; null si en este ambiente no está configurado. */
+  for(code: StorageProviderCode): StorageProvider | null;
+}
+
 /** Vida del ticket de subida. Cloudinary acepta firmas de hasta 1 hora. */
 export const UPLOAD_TICKET_TTL_MS = 30 * 60 * 1000;

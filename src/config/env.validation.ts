@@ -251,9 +251,12 @@ export class EnvironmentVariables {
   @MinLength(10)
   CLOUDINARY_API_SECRET?: string;
 
-  /** Carpeta raíz en Cloudinary (separa ambientes en la misma cuenta). */
-  @Matches(/^[a-z0-9_-]+$/)
-  CLOUDINARY_FOLDER = 'nexo-dev';
+  /**
+   * Carpeta raíz en Cloudinary: separa a Repara Ya de otros proyectos de la misma cuenta y cada
+   * ambiente del otro (ADR 0036): `repara-ya/dev`, `repara-ya/prod`. Minúsculas, números, guiones y `/`.
+   */
+  @Matches(/^[a-z0-9_-]+(\/[a-z0-9_-]+)*$/)
+  CLOUDINARY_FOLDER = 'repara-ya/dev';
 
   // ---- Verificación de identidad (ADR 0003) ----
 
@@ -425,6 +428,12 @@ function productionRules(env: EnvironmentVariables): string[] {
   if (env.NODE_ENV !== 'production') return [];
   const problems: string[] = [];
   // El disco de Railway es efímero: los archivos se perderían en cada deploy.
+  if (/(^|[/_-])(dev|test)$/.test(env.CLOUDINARY_FOLDER)) {
+    // Producción nunca escribe en la carpeta de desarrollo (ni en la de pruebas).
+    problems.push(
+      'CLOUDINARY_FOLDER (en producción, la carpeta de producción, p. ej. repara-ya/prod)',
+    );
+  }
   if (env.STORAGE_PROVIDER === 'local') {
     problems.push('STORAGE_PROVIDER (en producción los archivos van a Cloudinary)');
   }

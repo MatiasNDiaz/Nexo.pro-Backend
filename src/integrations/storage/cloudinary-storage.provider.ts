@@ -13,7 +13,7 @@ export interface CloudinaryCredentials {
   cloudName: string;
   apiKey: string;
   apiSecret: string;
-  /** Carpeta raíz del ambiente (nexo-dev, nexo-prod). */
+  /** Carpeta raíz del ambiente (repara-ya/dev, repara-ya/prod; ADR 0036). */
   folder: string;
 }
 

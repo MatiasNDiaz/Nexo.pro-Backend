@@ -15,8 +15,9 @@ import type { AuthUser } from '../common/decorators';
 import { LocalStorageProvider } from '../integrations/storage/local-storage.provider';
 import {
   type Access,
-  STORAGE_PROVIDER,
+  STORAGE_REGISTRY,
   type StorageProvider,
+  type StorageRegistry,
   type StoredObjectInfo,
 } from '../integrations/storage/storage.provider';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
@@ -71,8 +72,21 @@ export class UploadsService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly subscriptions: SubscriptionsService,
-    @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
+    @Inject(STORAGE_REGISTRY) private readonly registry: StorageRegistry,
   ) {}
+
+  /** Donde van los archivos nuevos. */
+  private get storage(): StorageProvider {
+    return this.registry.active;
+  }
+
+  /**
+   * El proveedor de un archivo existente: el que quedó en su fila (ADR 0036). Null si este ambiente
+   * no lo tiene configurado (por ejemplo, un archivo de disco en producción).
+   */
+  private storageOf(file: StoredFile): StorageProvider | null {
+    return this.registry.for(file.provider);
+  }
 
   async create(user: AuthUser, dto: CreateUploadDto): Promise<CreateUploadResponseDto> {
     const policy = FILE_POLICIES[dto.purpose];
@@ -142,7 +156,8 @@ export class UploadsService {
 
     // La consulta al proveedor va fuera de cualquier transacción; las actualizaciones son
     // condicionales (`status = PENDING_UPLOAD`) para que dos confirmaciones no se pisen.
-    const info = await this.storage.inspect(file.storageKey, file.kind, accessOf(file));
+    const storage = this.storageOf(file);
+    const info = storage ? await storage.inspect(file.storageKey, file.kind, accessOf(file)) : null;
     if (!info) {
       throw new ConflictException({
         code: 'UPLOAD_NOT_RECEIVED',
@@ -246,8 +261,8 @@ export class UploadsService {
 
   /** Subida al adaptador local (solo desarrollo y tests). */
   async storeLocalContent(user: AuthUser, fileId: string, data: Buffer): Promise<void> {
-    const local = this.localStorage();
     const file = await this.findOwn(user.id, fileId);
+    const local = this.localStorageOf(file);
     this.assertPending(file);
     const maxBytes = await this.maxBytesFor(user.id, file.purpose, file.kind);
     if (data.length > maxBytes) throw this.tooLarge(maxBytes);
@@ -262,22 +277,23 @@ export class UploadsService {
     file: StoredFile,
   ): Promise<{ redirectUrl: string } | { data: Buffer; mimeType: string }> {
     if (file.status !== FileStatus.READY || !file.mimeType) throw notFound();
-    const url = this.storage.privateUrl(file.storageKey, file.kind, file.mimeType, 5 * 60);
+    const storage = this.storageOf(file);
+    if (!storage) throw notFound();
+    const url = storage.privateUrl(file.storageKey, file.kind, file.mimeType, 5 * 60);
     if (url) return { redirectUrl: url };
-    const data = await this.localStorage().read(file.storageKey);
+    const data = await this.localStorageOf(file).read(file.storageKey);
     if (!data) throw notFound();
     return { data, mimeType: file.mimeType };
   }
 
   /** Contenido de un archivo público del adaptador local (solo desarrollo y tests). */
   async readLocalPublic(fileId: string): Promise<{ data: Buffer; mimeType: string }> {
-    const local = this.localStorage();
     const file = await this.dataSource.getRepository(StoredFile).findOneBy({
       id: fileId,
       status: FileStatus.READY,
       visibility: FileVisibility.PUBLIC,
     });
-    const data = file ? await local.read(file.storageKey) : null;
+    const data = file ? await this.localStorageOf(file).read(file.storageKey) : null;
     if (!file?.mimeType || !data) throw notFound();
     return { data, mimeType: file.mimeType };
   }
@@ -337,7 +353,9 @@ export class UploadsService {
     let deleted = 0;
     for (const file of files) {
       try {
-        await this.storage.delete(file.storageKey, file.kind, accessOf(file));
+        const storage = this.storageOf(file);
+        if (!storage) throw new Error(`Proveedor ${file.provider} no configurado`);
+        await storage.delete(file.storageKey, file.kind, accessOf(file));
         await this.dataSource
           .getRepository(StoredFile)
           .update(file.id, { storageDeletedAt: new Date() });
@@ -376,7 +394,9 @@ export class UploadsService {
     const files = await this.dataSource.getRepository(StoredFile).findBy({ id: In(fileIds) });
     for (const file of files) {
       try {
-        await this.storage.setAccess(file.storageKey, file.kind, accessOf(file));
+        const storage = this.storageOf(file);
+        if (!storage) throw new Error(`Proveedor ${file.provider} no configurado`);
+        await storage.setAccess(file.storageKey, file.kind, accessOf(file));
       } catch {
         this.logger.error(`No se pudo cambiar el acceso del archivo ${file.id} en el proveedor`);
       }
@@ -399,7 +419,7 @@ export class UploadsService {
 
   urlOf(file: StoredFile): string | null {
     if (file.status !== FileStatus.READY || file.visibility !== FileVisibility.PUBLIC) return null;
-    return this.storage.publicUrl(file.storageKey, file.kind, file.id);
+    return this.storageOf(file)?.publicUrl(file.storageKey, file.kind, file.id) ?? null;
   }
 
   /** Peso máximo para ese usuario. Lanza 403 si el propósito exige plan y no tiene uno vigente. */
@@ -460,8 +480,10 @@ export class UploadsService {
     return file;
   }
 
-  private localStorage(): LocalStorageProvider {
-    if (!(this.storage instanceof LocalStorageProvider)) throw notFound();
-    return this.storage;
+  /** El adaptador de disco, solo para archivos que viven en disco (de otro proveedor: 404). */
+  private localStorageOf(file: StoredFile): LocalStorageProvider {
+    const storage = this.storageOf(file);
+    if (!(storage instanceof LocalStorageProvider)) throw notFound();
+    return storage;
   }
 }
