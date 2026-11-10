@@ -245,6 +245,22 @@ describe('validateEnv', () => {
       ).toBe('fake');
     });
 
+    it('email con Resend (ADR 0035): exige la clave y un remitente que no sea localhost', () => {
+      expect(() => validateEnv({ ...base, MAIL_PROVIDER: 'resend' })).toThrow(
+        /RESEND_API_KEY.*MAIL_FROM/s,
+      );
+      expect(() =>
+        validateEnv({ ...base, MAIL_PROVIDER: 'resend', RESEND_API_KEY: 'otra-cosa' }),
+      ).toThrow(/RESEND_API_KEY/);
+      const ok = {
+        ...base,
+        MAIL_PROVIDER: 'resend',
+        RESEND_API_KEY: 're_' + 'a'.repeat(30),
+        MAIL_FROM: 'Repara Ya <hola@reparaya.com.ar>',
+      };
+      expect(validateEnv(ok).MAIL_PROVIDER).toBe('resend');
+    });
+
     it('push: apagado por defecto; con web-push exige las tres variables VAPID válidas', () => {
       expect(validateEnv(base).PUSH_PROVIDER).toBe('disabled');
       expect(() => validateEnv({ ...base, PUSH_PROVIDER: 'webpush' })).toThrow(
