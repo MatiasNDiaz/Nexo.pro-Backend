@@ -19,7 +19,7 @@ del sitio de Turnstile o el ID de cliente de Google) sí se puede compartir.
 | -------------------- | -------------------------------------------------- | ---------------------------- | ----------------------------------------- |
 | Resend               | Emails (verificación, contraseña, soporte, avisos) | Gratis hasta 3.000/mes       | Código listo (etapa 16)                   |
 | Cloudinary           | Fotos y videos                                     | Gratis hasta 25 créditos/mes | **Hecho en local** (cuenta propia)        |
-| Google Cloud         | Ingresar con Google                                | Gratis                       | Código listo                              |
+| Google Cloud         | Ingresar con Google                                | Gratis                       | **Hecho en local** (proyecto propio)      |
 | Mercado Pago         | Cobrar los planes                                  | Comisión por venta           | Código listo                              |
 | Cloudflare Turnstile | Frenar robots en registro, ingreso y contacto      | Gratis                       | Código listo                              |
 | Sentry               | Avisos de errores en producción                    | Gratis (plan Developer)      | Código listo                              |
@@ -94,29 +94,28 @@ en el que se subió (ADR 0036, etapa 17).
 
 ### Ingresar con Google (OAuth)
 
-Usá un proyecto **nuevo** de Google Cloud para Repara Ya (no el de otro proyecto) y un cliente OAuth
-por ambiente:
+Repara Ya tiene su **propio proyecto** de Google Cloud (`repara-ya`, con un Gmail aparte de
+CercaTrova) y un cliente OAuth por ambiente:
 
-1. console.cloud.google.com → creá un proyecto ("Repara Ya").
-
-1. console.cloud.google.com → creá un proyecto ("Repara Ya").
-1. **APIs y servicios → Pantalla de consentimiento de OAuth**: tipo _Externo_, nombre de la app, email
-   de soporte y el dominio. Alcances: `openid`, `email`, `profile`.
-1. **Credenciales → Crear credenciales → ID de cliente de OAuth → Aplicación web**, dos veces:
-   - "Repara Ya — desarrollo", con _URI de redireccionamiento autorizado_
+1. console.cloud.google.com → proyecto `repara-ya`.
+1. **Google Auth Platform → Branding**: nombre "Repara Ya" y email de soporte. **Audience**: _External_
+   (en _Testing_ mientras se desarrolla, con los usuarios de prueba). **Data access**: solo `openid`,
+   `email` y `profile`.
+1. **Clients → Create client → Web application**, uno por ambiente:
+   - `repara-ya-dev` (hecho), con _Authorized redirect URI_
      `http://localhost:3001/api/v1/auth/google/callback`.
-   - "Repara Ya — producción", con `https://<tu-api>/api/v1/auth/google/callback` (cuando haya
-     dominio).
-     No hace falta cargar _Orígenes de JavaScript autorizados_: el intercambio lo hace el backend.
-1. Backend (con el cliente de desarrollo):
+   - `repara-ya-prod`, con `https://<tu-api>/api/v1/auth/google/callback` (cuando haya dominio).
+     No hace falta cargar _Authorized JavaScript origins_: el intercambio lo hace el backend.
+1. Backend (`.env.development.local`, con el cliente de desarrollo):
    ```
    GOOGLE_PROVIDER=google
    GOOGLE_CLIENT_ID=....apps.googleusercontent.com
-   GOOGLE_CLIENT_SECRET=...         # secreta
-   GOOGLE_CALLBACK_URL=http://localhost:3001/api/v1/auth/google/callback
+   GOOGLE_CLIENT_SECRET=...         # secreta: solo en el archivo
    ```
-1. Frontend: `NEXT_PUBLIC_GOOGLE_LOGIN=true` (muestra el botón).
-1. Prueba: "Ingresar con Google" en /ingresar.
+   `GOOGLE_CALLBACK_URL` ya está en `.env.development`.
+1. Frontend: `NEXT_PUBLIC_GOOGLE_LOGIN=true` (muestra el botón; ya está en `.env.development`).
+1. Prueba: "Entrar con Google" en /ingresar. **Hecho el 10/11/2026:** el backend arma el enlace con PKCE
+   y `state`, Google acepta el cliente y una cuenta existente quedó vinculada con su contraseña.
 
 Mientras la app esté "en prueba" en Google, solo pueden entrar los emails que agregues como usuarios
 de prueba. Para abrirla a todos, Google revisa la pantalla de consentimiento.
