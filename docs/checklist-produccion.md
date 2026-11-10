@@ -49,15 +49,14 @@ En este orden, porque cada una necesita la anterior:
 3. [ ] **Vercel** para el frontend (staging y producción).
 4. [ ] **GitHub:** proteger `main` (PR obligatorio y CI en verde), secret scanning y push protection
        (`operacion.md` §9).
-5. [ ] **Proveedor de email transaccional** (por ejemplo Resend, Postmark o Amazon SES): cuenta,
-       dominio verificado con SPF y DKIM, y la clave de la API. **Sin esto la API no arranca en
-       producción.** Avisarle a Claude cuál se eligió (ver Fase 2).
-6. [ ] **Cloudinary:** cuenta, credenciales y activar _Allow delivery of PDF and ZIP files_ (para
-       los certificados).
+5. [ ] **Resend** (elegido, ADR 0035): cuenta, dominio verificado con SPF y DKIM, y la clave de la
+       API. **Sin esto la API no arranca en producción.** En pausa hasta tener el dominio (10/11/2026).
+6. [ ] **Cloudinary:** cuenta propia y clave de desarrollo **hechas** (10/11/2026). Falta activar
+       _Allow delivery of PDF and ZIP files_ (para los certificados) y la clave `repara-ya-prod`.
 7. [ ] **Mercado Pago:** primero las credenciales **de prueba** (para staging) y después las
        **productivas**: access token y clave de webhooks.
-8. [ ] **Google Cloud:** proyecto, pantalla de consentimiento y cliente OAuth con las URLs de callback
-       de staging y producción (ADR 0023).
+8. [ ] **Google Cloud:** proyecto, pantalla de consentimiento y cliente de desarrollo **hechos**
+       (10/11/2026). Faltan los clientes de staging y producción con sus URLs `https` (ADR 0023).
 9. [ ] **Cloudflare:** Turnstile (site key y secreto), **Tunnel** para la API y **R2** para el backup
        propio (bucket privado con regla de 30 días y un token solo para ese bucket).
 10. [ ] **Sentry** (proyecto Node.js, `SENTRY_DSN`, alerta por email) y **UptimeRobot** o Better
@@ -72,8 +71,7 @@ En este orden, porque cada una necesita la anterior:
 Cada punto sigue el flujo de siempre: diseño y cambios en la base antes de crear nada, rama propia,
 tests, CI y tu aprobación.
 
-1. [ ] **Adaptador del proveedor de email** elegido en la Fase 1 (interfaz + adaptador, como los
-       demás). Puede sumar una dependencia: se pide aprobación. **Bloquea el lanzamiento.**
+1. [x] **Adaptador del proveedor de email:** Resend, sin dependencias nuevas (ADR 0035, etapa 16).
 2. [ ] **Rechazo de requests sin `x-nexo-edge-secret`** cuando `CLOUDFLARE_EDGE_SECRET` está
        configurado (salvo `/health/live`), para que solo se entre por Cloudflare. **Bloquea el
        lanzamiento.**
@@ -88,16 +86,13 @@ tests, CI y tu aprobación.
 
 ## Fase 3 — Frontend (otro repositorio)
 
-- [ ] **Frontend — Páginas que enlazan los emails:**
-  - `/verificar-email`
-  - `/restablecer-contrasena`
-  - `/vincular-google`
-  - `/ingresar/google`
-  - `/suscripcion/resultado`
-  - `/cerrar-sesion`: muestra un botón y **no cierra nada al abrirse**; ver `auth.md`.
-- [ ] **Frontend — Push:** el service worker, el pedido de permiso y la explicación para el iPhone
-      ([`push.md`](push.md)).
-- [ ] **Frontend — Turnstile:** el widget en el registro, el contacto y el login después de 3 fallos.
+- [x] **Frontend — Páginas que enlazan los emails** (`/verificar-email`, `/restablecer-contrasena`,
+      `/vincular-google`, `/ingresar/google`, `/suscripcion/resultado`, `/cerrar-sesion`).
+- [x] **Frontend — Push:** service worker y pedido de permiso (probado en local).
+- [x] **Frontend — Turnstile:** el widget en el registro, el contacto y el login (falta la cuenta de
+      Cloudflare para encenderlo).
+- [ ] **Frontend — Etapa 8 (cierre):** CSP con nonce, accesibilidad, Lighthouse y textos legales
+      definitivos.
 
 ## Fase 4 — Staging: probar todo con cuentas reales (Juntos)
 
