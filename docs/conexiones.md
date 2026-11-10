@@ -6,6 +6,12 @@ faltan las credenciales. Para probar en tu computadora, las variables del backen
 no se suben a GitHub). En producción van en las variables de Railway (backend) y del hosting del
 frontend.
 
+**Desarrollo y producción, siempre separados:** cada servicio tiene una credencial para tu
+computadora (`.env.development.local`) y otra distinta para producción (Railway). Así una prueba local
+no puede tocar datos reales, y si una clave de desarrollo se filtra, se revoca sin cortar producción.
+Tampoco se reutilizan las credenciales de otros proyectos: si una cuenta se comparte (por ejemplo
+Cloudinary), Repara Ya usa sus propias claves y su propia carpeta.
+
 **Regla de oro:** las claves secretas no se pegan en un chat, un email ni un documento compartido. Se
 pegan directo en el archivo `.env` o en el panel de Railway. Lo que es público (por ejemplo la clave
 del sitio de Turnstile o el ID de cliente de Google) sí se puede compartir.
@@ -47,38 +53,69 @@ probar, no para usuarios reales.
 Hoy las fotos se guardan en la carpeta `.uploads` de tu computadora; en Railway se borrarían en cada
 deploy, por eso en producción es obligatorio.
 
-1. Creá la cuenta en cloudinary.com.
-2. En el **Dashboard** están los tres datos: _Cloud name_, _API Key_ y _API Secret_.
-3. Backend:
+Se puede usar una cuenta que ya tengas para otro proyecto. Lo que separa a Repara Ya:
+
+- **Carpeta propia por ambiente** (`CLOUDINARY_FOLDER`): todos los archivos se guardan con un
+  `public_id` que empieza con esa carpeta. El backend solo consulta, mueve (público ↔ privado) o borra
+  archivos por su `public_id` exacto, que sale de su propia base: nunca lista ni borra por carpeta, así
+  que no puede tocar archivos de otro proyecto.
+- **Claves propias**: en _Settings → API Keys_ se genera un par de claves nuevo para Repara Ya (uno para
+  desarrollo y otro para producción). Se pueden revocar sin afectar las del otro proyecto. Ojo: en
+  Cloudinary una clave tiene permiso sobre **toda** la cuenta (no se limita a una carpeta); la
+  separación la da el código. Si tu plan permite crear otro _Product environment_, esa es la
+  separación más fuerte (otro _cloud name_ con sus propios archivos y claves).
+- **Cuota compartida**: el plan (créditos, almacenamiento) es el mismo para los dos proyectos.
+
+1. En tu cuenta: _Settings → API Keys → Generate new API key_. Nombrala "repara-ya-dev".
+2. Backend (`.env.development.local`):
    ```
    STORAGE_PROVIDER=cloudinary
-   CLOUDINARY_CLOUD_NAME=...
-   CLOUDINARY_API_KEY=...
+   CLOUDINARY_CLOUD_NAME=...        # el de tu cuenta (Dashboard)
+   CLOUDINARY_API_KEY=...           # la nueva, "repara-ya-dev"
    CLOUDINARY_API_SECRET=...        # secreta
+   CLOUDINARY_FOLDER=repara-ya-dev  # producción: repara-ya-prod (en Railway, con su propia clave)
    ```
-4. Prueba: subí una foto de trabajo desde "Mi perfil" y fijate que aparezca en _Media Library_.
+3. Prueba: subí una foto de trabajo desde "Mi perfil" y fijate que aparezca en _Media Library_ con un
+   `public_id` que empieza con `repara-ya-dev/`.
 
-Las fotos de demo que ya están en tu disco no se mudan solas: siguen sirviéndose solo mientras uses
-`STORAGE_PROVIDER=local`.
+`CLOUDINARY_FOLDER` hoy acepta solo letras, números y guiones (sin `/`). Las fotos de demo que ya
+están en tu disco se muestran solo con `STORAGE_PROVIDER=local`: al pasar a Cloudinary dejan de verse
+(el backend arma la dirección con el proveedor activo).
 
-## 3. Google (ingresar con Google)
+## 3. Google: dos cosas distintas
+
+- **Segundo factor del admin (Google Authenticator):** es TOTP estándar, se calcula en tu celular y en
+  el backend (`otplib`), sin conexión con Google. **No necesita ninguna credencial ni cuenta de Google
+  Cloud.** Solo se carga el secreto en la app (lo da `npm run admin:create`). Sirve cualquier app de
+  códigos (Google Authenticator, Authy, 1Password).
+- **Ingresar con Google (OAuth / OpenID Connect):** es lo de esta sección. Necesita un proyecto en
+  Google Cloud.
+
+### Ingresar con Google (OAuth)
+
+Usá un proyecto **nuevo** de Google Cloud para Repara Ya (no el de otro proyecto) y un cliente OAuth
+por ambiente:
 
 1. console.cloud.google.com → creá un proyecto ("Repara Ya").
-2. **APIs y servicios → Pantalla de consentimiento de OAuth**: tipo _Externo_, nombre de la app, email
+
+1. console.cloud.google.com → creá un proyecto ("Repara Ya").
+1. **APIs y servicios → Pantalla de consentimiento de OAuth**: tipo _Externo_, nombre de la app, email
    de soporte y el dominio. Alcances: `openid`, `email`, `profile`.
-3. **Credenciales → Crear credenciales → ID de cliente de OAuth → Aplicación web**.
-   - _URI de redireccionamiento autorizados_:
-     - local: `http://localhost:3001/api/v1/auth/google/callback`
-     - producción: `https://<tu-api>/api/v1/auth/google/callback`
-4. Backend:
+1. **Credenciales → Crear credenciales → ID de cliente de OAuth → Aplicación web**, dos veces:
+   - "Repara Ya — desarrollo", con _URI de redireccionamiento autorizado_
+     `http://localhost:3001/api/v1/auth/google/callback`.
+   - "Repara Ya — producción", con `https://<tu-api>/api/v1/auth/google/callback` (cuando haya
+     dominio).
+     No hace falta cargar _Orígenes de JavaScript autorizados_: el intercambio lo hace el backend.
+1. Backend (con el cliente de desarrollo):
    ```
    GOOGLE_PROVIDER=google
    GOOGLE_CLIENT_ID=....apps.googleusercontent.com
    GOOGLE_CLIENT_SECRET=...         # secreta
    GOOGLE_CALLBACK_URL=http://localhost:3001/api/v1/auth/google/callback
    ```
-5. Frontend: `NEXT_PUBLIC_GOOGLE_LOGIN=true` (muestra el botón).
-6. Prueba: "Ingresar con Google" en /ingresar.
+1. Frontend: `NEXT_PUBLIC_GOOGLE_LOGIN=true` (muestra el botón).
+1. Prueba: "Ingresar con Google" en /ingresar.
 
 Mientras la app esté "en prueba" en Google, solo pueden entrar los emails que agregues como usuarios
 de prueba. Para abrirla a todos, Google revisa la pantalla de consentimiento.
