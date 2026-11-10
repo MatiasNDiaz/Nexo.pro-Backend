@@ -63,17 +63,17 @@ Secretos: generalos con `node -e "console.log(require('crypto').randomBytes(64).
 
 ## Archivos e identidad (etapa 7.1)
 
-| Variable                       | Obligatoria      | Defecto    | Descripción                                                                                           |
-| ------------------------------ | ---------------- | ---------- | ----------------------------------------------------------------------------------------------------- |
-| `STORAGE_PROVIDER`             | No               | `local`    | `local` (disco: desarrollo y tests) o `cloudinary`. **En producción solo `cloudinary`** (ADR 0018)    |
-| `STORAGE_LOCAL_DIR`            | No               | `.uploads` | Carpeta del adaptador local (ignorada por git; en Docker, volumen `uploads`)                          |
-| `CLOUDINARY_CLOUD_NAME`        | Con `cloudinary` | —          | Nombre de la cuenta                                                                                   |
-| `CLOUDINARY_API_KEY`           | Con `cloudinary` | —          | Clave de API                                                                                          |
-| `CLOUDINARY_API_SECRET`        | Con `cloudinary` | —          | **Secreto**: firma las subidas. Nunca en el frontend ni en logs                                       |
-| `CLOUDINARY_FOLDER`            | No               | `nexo-dev` | Carpeta raíz, una por ambiente (`nexo-dev`, `nexo-prod`)                                              |
-| `IDENTITY_PROVIDER`            | No               | `manual`   | `manual` (decide el admin, ADR 0003) o `fake` (simulado: desarrollo y tests, prohibido en producción) |
-| `IDENTITY_MAX_ATTEMPTS`        | No               | `3`        | Intentos de verificación por usuario antes de pedir contacto con soporte                              |
-| `FAKE_IDENTITY_WEBHOOK_SECRET` | Con `fake`       | —          | Secreto HMAC de los webhooks simulados (≥ 32)                                                         |
+| Variable                       | Obligatoria      | Defecto         | Descripción                                                                                                                      |
+| ------------------------------ | ---------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `STORAGE_PROVIDER`             | No               | `local`         | `local` (disco: desarrollo y tests) o `cloudinary`. **En producción solo `cloudinary`** (ADR 0018)                               |
+| `STORAGE_LOCAL_DIR`            | No               | `.uploads`      | Carpeta del adaptador local (ignorada por git; en Docker, volumen `uploads`)                                                     |
+| `CLOUDINARY_CLOUD_NAME`        | Con `cloudinary` | —               | Nombre de la cuenta                                                                                                              |
+| `CLOUDINARY_API_KEY`           | Con `cloudinary` | —               | Clave de API                                                                                                                     |
+| `CLOUDINARY_API_SECRET`        | Con `cloudinary` | —               | **Secreto**: firma las subidas. Nunca en el frontend ni en logs                                                                  |
+| `CLOUDINARY_FOLDER`            | No               | `repara-ya/dev` | Carpeta raíz, una por ambiente (`repara-ya/dev`, `repara-ya/prod`; ADR 0036). En producción no puede terminar en `dev` ni `test` |
+| `IDENTITY_PROVIDER`            | No               | `manual`        | `manual` (decide el admin, ADR 0003) o `fake` (simulado: desarrollo y tests, prohibido en producción)                            |
+| `IDENTITY_MAX_ATTEMPTS`        | No               | `3`             | Intentos de verificación por usuario antes de pedir contacto con soporte                                                         |
+| `FAKE_IDENTITY_WEBHOOK_SECRET` | Con `fake`       | —               | Secreto HMAC de los webhooks simulados (≥ 32)                                                                                    |
 
 En `.env.test` estas variables tienen valores fijos de prueba (públicos en el repo: no sirven para
 otro ambiente) y `TRUST_PROXY=1`, para que cada cliente de los e2e simule su propia IP.
