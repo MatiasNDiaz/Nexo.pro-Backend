@@ -216,6 +216,16 @@ export class AdminProfessionalContentController {
     private readonly profiles: ProfileService,
   ) {}
 
+  /**
+   * El perfil completo de un profesional como lo ve él en su panel: fotos y certificados con su id y
+   * estado (también los ocultos, con el motivo). Solo lectura: lo necesita el admin para moderarlos.
+   */
+  @Get(':userId/profile')
+  @ApiOkResponse({ type: ProfessionalMeDto })
+  profile(@Param('userId', ParseUUIDPipe) userId: string): Promise<ProfessionalMeDto> {
+    return this.profiles.me(userId);
+  }
+
   /** Edita los datos del perfil de un profesional (ADR 0021), con motivo y auditoría. */
   @Patch(':userId/profile')
   @ApiOkResponse({ type: ProfessionalMeDto })

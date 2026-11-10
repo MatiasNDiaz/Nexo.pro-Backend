@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DataSource } from 'typeorm';
 import { AdminAuditLog } from '../src/audit/entities/admin-audit-log.entity';
@@ -576,6 +577,19 @@ describe('Perfil profesional, medios, certificados y prueba (e2e)', () => {
         url: null,
         hiddenReason: 'Muestra el número de DNI',
       });
+      // El admin ve el perfil completo, con lo oculto y su motivo (para poder restaurarlo).
+      const proId = (await client.get('/auth/me')).body.id as string;
+      const seen = await admin.get(`/admin/professionals/${proId}/profile`);
+      expect(seen.status).toBe(200);
+      expect(seen.body.certifications[0]).toMatchObject({
+        id,
+        status: 'HIDDEN_BY_ADMIN',
+        hiddenReason: 'Muestra el número de DNI',
+      });
+      expect((await client.get(`/admin/professionals/${proId}/profile`)).status).toBe(403);
+      const unknown = await admin.get(`/admin/professionals/${randomUUID()}/profile`);
+      expect(unknown.status).toBe(404);
+      expect(unknown.body.code).toBe('PROFILE_NOT_FOUND');
       expect((await new Client(app).agent.get(url)).status).toBe(404);
       expect(
         await dataSource

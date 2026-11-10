@@ -27,6 +27,7 @@ recurso (anti-IDOR) la valida cada servicio; ver `docs/revision-seguridad.md`.
 | `GET /api/v1/admin/platform-reviews` | ADMIN | ACTIVE | — | — | global |
 | `POST /api/v1/admin/platform-reviews/:id/publish` | ADMIN | ACTIVE | Sí | Sí | global |
 | `POST /api/v1/admin/platform-reviews/:id/unpublish` | ADMIN | ACTIVE | Sí | Sí | global |
+| `GET /api/v1/admin/professionals/:userId/profile` | ADMIN | ACTIVE | — | — | global |
 | `PATCH /api/v1/admin/professionals/:userId/profile` | ADMIN | ACTIVE | Sí | Sí | global |
 | `POST /api/v1/admin/professionals/certifications/:id/hide` | ADMIN | ACTIVE | Sí | Sí | global |
 | `POST /api/v1/admin/professionals/certifications/:id/restore` | ADMIN | ACTIVE | Sí | Sí | global |
