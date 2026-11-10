@@ -31,7 +31,7 @@ export type PaymentsProviderName = (typeof PAYMENTS_PROVIDERS)[number];
 export const PUSH_PROVIDERS = ['disabled', 'webpush', 'fake'] as const;
 export type PushProviderName = (typeof PUSH_PROVIDERS)[number];
 
-export const MAIL_PROVIDERS = ['console', 'memory'] as const;
+export const MAIL_PROVIDERS = ['console', 'memory', 'resend'] as const;
 export type MailProviderName = (typeof MAIL_PROVIDERS)[number];
 
 export const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
@@ -227,6 +227,11 @@ export class EnvironmentVariables {
   @MinLength(3)
   MAIL_FROM = 'Nexo PRO <no-reply@localhost>';
 
+  /** Clave de Resend (ADR 0035), obligatoria con MAIL_PROVIDER=resend. **Secreta**. */
+  @IsOptional()
+  @Matches(/^re_[A-Za-z0-9_]{20,}$/)
+  RESEND_API_KEY?: string;
+
   // ---- Archivos (ADR 0018) ----
 
   /** `local` (desarrollo y tests: disco) o `cloudinary`. En producción, solo cloudinary. */
@@ -406,6 +411,13 @@ function providerRules(env: EnvironmentVariables): string[] {
   }
   if (env.PAYMENTS_PROVIDER === 'mercadopago' && !env.MERCADOPAGO_ACCESS_TOKEN) {
     problems.push('MERCADOPAGO_ACCESS_TOKEN (obligatoria con PAYMENTS_PROVIDER=mercadopago)');
+  }
+  if (env.MAIL_PROVIDER === 'resend') {
+    if (!env.RESEND_API_KEY) problems.push('RESEND_API_KEY (obligatoria con MAIL_PROVIDER=resend)');
+    // Resend rechaza remitentes de dominios no verificados; localhost nunca lo está.
+    if (/@localhost>?$/.test(env.MAIL_FROM)) {
+      problems.push('MAIL_FROM (con Resend, un email de tu dominio verificado)');
+    }
   }
   if (env.PUSH_PROVIDER === 'webpush') {
     for (const name of ['VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_SUBJECT'] as const) {

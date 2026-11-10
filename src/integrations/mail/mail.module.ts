@@ -3,6 +3,7 @@ import { MailConfig, mailConfig } from '../../config/mail.config';
 import { ConsoleMailProvider } from './console-mail.provider';
 import { MAIL_PROVIDER, MailProvider } from './mail-provider';
 import { MemoryMailProvider } from './memory-mail.provider';
+import { ResendMailProvider } from './resend-mail.provider';
 
 export function createMailProvider(config: MailConfig): MailProvider {
   switch (config.provider) {
@@ -10,6 +11,9 @@ export function createMailProvider(config: MailConfig): MailProvider {
       return new ConsoleMailProvider();
     case 'memory':
       return new MemoryMailProvider();
+    case 'resend':
+      // La validación del entorno exige la clave con MAIL_PROVIDER=resend.
+      return new ResendMailProvider(config.resendApiKey!, config.from);
   }
 }
 
