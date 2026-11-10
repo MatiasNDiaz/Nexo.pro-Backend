@@ -35,6 +35,9 @@ import {
   SocialNetwork,
 } from '../professional.enums';
 import {
+  HEX_COLOR,
+  SECTION_ANIMATIONS,
+  SECTION_SIZES,
   THEME_ANIMATIONS,
   THEME_COLORS,
   THEME_FONTS,
@@ -104,6 +107,58 @@ class ThemeGradientDto {
   @ApiProperty({ enum: THEME_COLORS }) @IsIn(THEME_COLORS) to: ThemeColor;
 }
 
+const lower = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? value.trim().toLowerCase() : value;
+
+/** Estilo de una sección (ADR 0034). Colores solo `#rrggbb`; tamaño y animación de listas cerradas. */
+export class SectionStyleDto {
+  @ApiPropertyOptional({ example: '#123b7a', pattern: HEX_COLOR.source })
+  @IsOptional()
+  @Transform(lower)
+  @IsString()
+  @Matches(HEX_COLOR)
+  background?: string;
+
+  @ApiPropertyOptional({ example: '#0b1f3a', description: 'Degradé con `background` (solo Premium)' })
+  @IsOptional()
+  @Transform(lower)
+  @IsString()
+  @Matches(HEX_COLOR)
+  backgroundTo?: string;
+
+  @ApiPropertyOptional({ example: '#ffffff' })
+  @IsOptional()
+  @Transform(lower)
+  @IsString()
+  @Matches(HEX_COLOR)
+  text?: string;
+
+  @ApiPropertyOptional({ enum: SECTION_SIZES, description: 'Escala en %, solo Premium' })
+  @IsOptional()
+  @IsIn(SECTION_SIZES)
+  size?: (typeof SECTION_SIZES)[number];
+
+  @ApiPropertyOptional({ enum: SECTION_ANIMATIONS, description: 'Solo Premium' })
+  @IsOptional()
+  @IsIn(SECTION_ANIMATIONS)
+  animation?: (typeof SECTION_ANIMATIONS)[number];
+}
+
+/** Una propiedad opcional por sección de THEME_SECTIONS: cualquier otra clave responde 400. */
+export class ThemeSectionsDto {
+  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) pagina?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) presentacion?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) datos?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) sobre?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) trabajos?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) certificados?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) resenas?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) contacto?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) zonas?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) horarios?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) redes?: SectionStyleDto;
+}
+
 /** Personalización (opciones cerradas). Lo que el plan no admite responde 403. */
 export class ProfileThemeDto {
   @ApiPropertyOptional({ enum: THEME_COLORS })
@@ -133,6 +188,15 @@ export class ProfileThemeDto {
   @IsOptional()
   @IsIn(THEME_ANIMATIONS)
   animation?: (typeof THEME_ANIMATIONS)[number];
+
+  @ApiPropertyOptional({
+    type: ThemeSectionsDto,
+    description: 'Estilo por sección (ADR 0034). Medium: fondo y letra; Premium: además degradé, tamaño y animación',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ThemeSectionsDto)
+  sections?: ThemeSectionsDto;
 }
 
 export class AttentionStatusDto {

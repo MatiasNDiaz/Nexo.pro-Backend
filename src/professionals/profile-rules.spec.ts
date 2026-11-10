@@ -3,7 +3,7 @@ import { daysUntil, trialReminderFor } from '../subscriptions/subscriptions.serv
 import { cordobaClock, effectiveAttentionStatus } from './attention-status';
 import { AttentionStatus, SocialNetwork } from './professional.enums';
 import { profileSlug, slugBase } from './profile-slug';
-import { themeFieldsNotAllowed } from './profile-theme';
+import { themeFieldsNotAllowed, themeForPlan } from './profile-theme';
 import { normalizeSocialUrl } from './social-links';
 
 // Lunes 2 de noviembre de 2026, 10:00 en Córdoba (UTC-3).
@@ -87,6 +87,41 @@ describe('personalización por plan', () => {
     expect(themeFieldsNotAllowed(theme, ThemeLevel.STANDARD)).toEqual(['animation']);
     expect(themeFieldsNotAllowed(theme, ThemeLevel.EXTENDED)).toEqual([]);
     expect(themeFieldsNotAllowed({}, ThemeLevel.NONE)).toEqual([]);
+  });
+
+  it('secciones (ADR 0034): Medium solo fondo y letra; Premium también degradé, tamaño y animación', () => {
+    const theme = {
+      sections: {
+        sobre: { background: '#123b7a', text: '#ffffff' },
+        contacto: { background: '#0b1f3a', backgroundTo: '#3b82f6', size: 110 as const, animation: 'rebote' as const },
+      },
+    };
+    expect(themeFieldsNotAllowed(theme, ThemeLevel.NONE)).toEqual(['sections']);
+    expect(themeFieldsNotAllowed(theme, ThemeLevel.STANDARD)).toEqual([
+      'sections.contacto.backgroundTo',
+      'sections.contacto.size',
+      'sections.contacto.animation',
+    ]);
+    expect(themeFieldsNotAllowed(theme, ThemeLevel.EXTENDED)).toEqual([]);
+  });
+
+  it('al bajar de plan se oculta lo que no incluye, sin dejar secciones vacías', () => {
+    const theme = {
+      color: 'azul' as const,
+      animation: 'zoom' as const,
+      sections: {
+        sobre: { background: '#123b7a', backgroundTo: '#3b82f6', text: '#ffffff' },
+        resenas: { animation: 'girar' as const },
+      },
+    };
+    expect(themeForPlan(theme, ThemeLevel.STANDARD)).toEqual({
+      color: 'azul',
+      sections: { sobre: { background: '#123b7a', text: '#ffffff' } },
+    });
+    expect(themeForPlan(theme, ThemeLevel.NONE)).toEqual({});
+    expect(themeForPlan(theme, ThemeLevel.EXTENDED)).toEqual(theme);
+    // Un degradé sin color de inicio no se muestra.
+    expect(themeForPlan({ sections: { datos: { backgroundTo: '#000000' } } }, ThemeLevel.EXTENDED)).toEqual({});
   });
 });
 

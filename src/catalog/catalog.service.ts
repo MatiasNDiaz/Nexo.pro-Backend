@@ -25,7 +25,7 @@ import {
   ProItemStatus,
   type RateMode,
 } from '../professionals/professional.enums';
-import { type ProfileTheme, themeFieldsNotAllowed } from '../professionals/profile-theme';
+import { themeForPlan } from '../professionals/profile-theme';
 import { SubscriptionPlan, ThemeLevel } from '../subscriptions/entities/subscription-plan.entity';
 import { FileKind } from '../uploads/file.enums';
 import { ratingColumns } from '../reviews/review-rules';
@@ -288,10 +288,8 @@ export class CatalogService {
         shown.push(entry);
       }
     }
-    const hiddenFields = new Set(themeFieldsNotAllowed(profile.theme, plan.themeLevel));
-    const theme = Object.fromEntries(
-      Object.entries(profile.theme).filter(([key]) => !hiddenFields.has(key)),
-    ) as ProfileTheme;
+    // Lo que el plan vigente no incluye se oculta (también dentro de cada sección), sin borrarlo.
+    const theme = themeForPlan(profile.theme, plan.themeLevel);
 
     return {
       ...item,
