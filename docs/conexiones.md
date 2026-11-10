@@ -60,10 +60,17 @@ Se puede usar una cuenta que ya tengas para otro proyecto. Lo que separa a Repar
   archivos por su `public_id` exacto, que sale de su propia base: nunca lista ni borra por carpeta, así
   que no puede tocar archivos de otro proyecto.
 - **Claves propias**: en _Settings → API Keys_ se genera un par de claves nuevo para Repara Ya (uno para
-  desarrollo y otro para producción). Se pueden revocar sin afectar las del otro proyecto. Ojo: en
-  Cloudinary una clave tiene permiso sobre **toda** la cuenta (no se limita a una carpeta); la
-  separación la da el código. Si tu plan permite crear otro _Product environment_, esa es la
-  separación más fuerte (otro _cloud name_ con sus propios archivos y claves).
+  desarrollo y otro para producción). Se pueden revocar sin afectar las del otro proyecto.
+- **Rol de la clave** (según la documentación de Cloudinary):
+  - _Master Admin_: puede todo en todo el _product environment_ (también los archivos del otro
+    proyecto). Funciona, pero si la clave se filtra el daño no se limita a Repara Ya.
+  - _Media Library User_: solo puede actuar en las carpetas que se le compartan. A una clave no se le
+    comparte una carpeta desde la consola: se hace una vez con la Admin API (`folder_operations`) usando
+    una clave _Master Admin_. Para todo lo que hace el backend (subir, consultar, ocultar, descargar y
+    borrar) hace falta el rol de carpeta **Manager** sobre `repara-ya`.
+  - Otro _Product environment_ (si el plan lo permite): la separación más fuerte (otro _cloud name_,
+    sus propios archivos y claves); ahí la clave puede ser _Master Admin_ sin riesgo para el otro
+    proyecto.
 - **Cuota compartida**: el plan (créditos, almacenamiento) es el mismo para los dos proyectos.
 
 1. En tu cuenta: _Settings → API Keys → Generate new API key_. Nombrala "repara-ya-dev".
@@ -73,14 +80,15 @@ Se puede usar una cuenta que ya tengas para otro proyecto. Lo que separa a Repar
    CLOUDINARY_CLOUD_NAME=...        # el de tu cuenta (Dashboard)
    CLOUDINARY_API_KEY=...           # la nueva, "repara-ya-dev"
    CLOUDINARY_API_SECRET=...        # secreta
-   CLOUDINARY_FOLDER=repara-ya-dev  # producción: repara-ya-prod (en Railway, con su propia clave)
+   CLOUDINARY_FOLDER=repara-ya/dev  # producción: repara-ya/prod (en Railway, con su propia clave)
    ```
-3. Prueba: subí una foto de trabajo desde "Mi perfil" y fijate que aparezca en _Media Library_ con un
-   `public_id` que empieza con `repara-ya-dev/`.
+3. Verificá los permisos: `npm run check:cloudinary`. Prueba las cinco operaciones del backend sobre un
+   archivo de prueba en `repara-ya/dev/_verificacion/` y lo borra; si algo falta, dice qué permiso.
+4. Prueba real: subí una foto de trabajo desde "Mi perfil" y fijate que aparezca en _Media Library_
+   dentro de `repara-ya/dev/`.
 
-`CLOUDINARY_FOLDER` hoy acepta solo letras, números y guiones (sin `/`). Las fotos de demo que ya
-están en tu disco se muestran solo con `STORAGE_PROVIDER=local`: al pasar a Cloudinary dejan de verse
-(el backend arma la dirección con el proveedor activo).
+Las fotos de demo que ya están en tu disco se siguen viendo: cada archivo se atiende con el proveedor
+en el que se subió (ADR 0036, etapa 17).
 
 ## 3. Google: dos cosas distintas
 
