@@ -9,8 +9,7 @@ frontend.
 **Desarrollo y producción, siempre separados:** cada servicio tiene una credencial para tu
 computadora (`.env.development.local`) y otra distinta para producción (Railway). Así una prueba local
 no puede tocar datos reales, y si una clave de desarrollo se filtra, se revoca sin cortar producción.
-Tampoco se reutilizan las credenciales de otros proyectos: si una cuenta se comparte (por ejemplo
-Cloudinary), Repara Ya usa sus propias claves y su propia carpeta.
+Tampoco se reutilizan las cuentas ni las credenciales de otros proyectos (por ejemplo CercaTrova).
 
 **Regla de oro:** las claves secretas no se pegan en un chat, un email ni un documento compartido. Se
 pegan directo en el archivo `.env` o en el panel de Railway. Lo que es público (por ejemplo la clave
@@ -19,7 +18,7 @@ del sitio de Turnstile o el ID de cliente de Google) sí se puede compartir.
 | Servicio             | Para qué                                           | Costo para empezar           | Estado                                    |
 | -------------------- | -------------------------------------------------- | ---------------------------- | ----------------------------------------- |
 | Resend               | Emails (verificación, contraseña, soporte, avisos) | Gratis hasta 3.000/mes       | Código listo (etapa 16)                   |
-| Cloudinary           | Fotos y videos                                     | Gratis hasta 25 créditos/mes | Código listo                              |
+| Cloudinary           | Fotos y videos                                     | Gratis hasta 25 créditos/mes | **Hecho en local** (cuenta propia)        |
 | Google Cloud         | Ingresar con Google                                | Gratis                       | Código listo                              |
 | Mercado Pago         | Cobrar los planes                                  | Comisión por venta           | Código listo                              |
 | Cloudflare Turnstile | Frenar robots en registro, ingreso y contacto      | Gratis                       | Código listo                              |
@@ -53,39 +52,33 @@ probar, no para usuarios reales.
 Hoy las fotos se guardan en la carpeta `.uploads` de tu computadora; en Railway se borrarían en cada
 deploy, por eso en producción es obligatorio.
 
-Se puede usar una cuenta que ya tengas para otro proyecto. Lo que separa a Repara Ya:
+**Repara Ya tiene su propia cuenta de Cloudinary** (cloud name `izww1vub`), creada con otro correo y
+totalmente separada de CercaTrova. Por eso las claves pueden tener rol _Master Admin_: no alcanzan a
+ningún otro proyecto. Dentro de la cuenta, desarrollo y producción se separan así:
 
-- **Carpeta propia por ambiente** (`CLOUDINARY_FOLDER`): todos los archivos se guardan con un
-  `public_id` que empieza con esa carpeta. El backend solo consulta, mueve (público ↔ privado) o borra
-  archivos por su `public_id` exacto, que sale de su propia base: nunca lista ni borra por carpeta, así
-  que no puede tocar archivos de otro proyecto.
-- **Claves propias**: en _Settings → API Keys_ se genera un par de claves nuevo para Repara Ya (uno para
-  desarrollo y otro para producción). Se pueden revocar sin afectar las del otro proyecto.
-- **Rol de la clave** (según la documentación de Cloudinary):
-  - _Master Admin_: puede todo en todo el _product environment_ (también los archivos del otro
-    proyecto). Funciona, pero si la clave se filtra el daño no se limita a Repara Ya.
-  - _Media Library User_: solo puede actuar en las carpetas que se le compartan. A una clave no se le
-    comparte una carpeta desde la consola: se hace una vez con la Admin API (`folder_operations`) usando
-    una clave _Master Admin_. Para todo lo que hace el backend (subir, consultar, ocultar, descargar y
-    borrar) hace falta el rol de carpeta **Manager** sobre `repara-ya`.
-  - Otro _Product environment_ (si el plan lo permite): la separación más fuerte (otro _cloud name_,
-    sus propios archivos y claves); ahí la clave puede ser _Master Admin_ sin riesgo para el otro
-    proyecto.
-- **Cuota compartida**: el plan (créditos, almacenamiento) es el mismo para los dos proyectos.
+- **Carpeta por ambiente** (`CLOUDINARY_FOLDER`): `repara-ya/dev` en tu computadora y `repara-ya/prod`
+  en producción (el backend rechaza en producción una carpeta que termine en `dev` o `test`). El backend
+  solo consulta, mueve (público ↔ privado) o borra archivos por su `public_id` exacto, que sale de su
+  propia base: nunca lista ni borra por carpeta.
+- **Una clave por ambiente**: "repara-ya-dev" (hecha) y "repara-ya-prod" (para Railway, más adelante).
+  Si una se filtra, se borra y se crea otra sin cortar la del otro ambiente.
+- **Cuota compartida**: el plan gratis (créditos, almacenamiento) es el mismo para dev y prod; conviene
+  borrar de vez en cuando lo que quede en `repara-ya/dev`.
 
-1. En tu cuenta: _Settings → API Keys → Generate new API key_. Nombrala "repara-ya-dev".
+1. _Settings → API Keys → Generate new API key_, con el nombre del ambiente ("repara-ya-dev").
 2. Backend (`.env.development.local`):
    ```
    STORAGE_PROVIDER=cloudinary
-   CLOUDINARY_CLOUD_NAME=...        # el de tu cuenta (Dashboard)
-   CLOUDINARY_API_KEY=...           # la nueva, "repara-ya-dev"
-   CLOUDINARY_API_SECRET=...        # secreta
+   CLOUDINARY_CLOUD_NAME=izww1vub
+   CLOUDINARY_API_KEY=...           # la de "repara-ya-dev"
+   CLOUDINARY_API_SECRET=...        # secreta: solo en el archivo
    CLOUDINARY_FOLDER=repara-ya/dev  # producción: repara-ya/prod (en Railway, con su propia clave)
    ```
-3. Verificá los permisos: `npm run check:cloudinary`. Prueba las cinco operaciones del backend sobre un
+3. Verificá los permisos: `npm run check:cloudinary`. Prueba las seis operaciones del backend sobre un
    archivo de prueba en `repara-ya/dev/_verificacion/` y lo borra; si algo falta, dice qué permiso.
-4. Prueba real: subí una foto de trabajo desde "Mi perfil" y fijate que aparezca en _Media Library_
-   dentro de `repara-ya/dev/`.
+   **Hecho el 10/11/2026: pasaron las seis.**
+4. Prueba real: subí una foto desde "Mi perfil" y fijate que aparezca en _Media Library_ dentro de
+   `repara-ya/dev/`. **Hecho el 10/11/2026** (foto de perfil de la clienta de prueba).
 
 Las fotos de demo que ya están en tu disco se siguen viendo: cada archivo se atiende con el proveedor
 en el que se subió (ADR 0036, etapa 17).
