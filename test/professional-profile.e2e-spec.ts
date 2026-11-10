@@ -225,13 +225,17 @@ describe('Perfil profesional, medios, certificados y prueba (e2e)', () => {
     it('estilo por sección (ADR 0034): colores #rrggbb, campos según el plan', async () => {
       const { client, id } = await signInProfessional(app);
       const sobre = { background: '#123B7A', text: '#ffffff' };
-      expect((await client.put('/professionals/me/theme', { sections: { sobre } })).status).toBe(403);
+      expect((await client.put('/professionals/me/theme', { sections: { sobre } })).status).toBe(
+        403,
+      );
 
       await setPlan(id, 'MEDIUM');
       const medium = await client.put('/professionals/me/theme', { sections: { sobre } });
       expect(medium.status).toBe(200);
       // Se guarda en minúsculas.
-      expect(medium.body.theme.sections).toEqual({ sobre: { background: '#123b7a', text: '#ffffff' } });
+      expect(medium.body.theme.sections).toEqual({
+        sobre: { background: '#123b7a', text: '#ffffff' },
+      });
       const premiumOnly = await client.put('/professionals/me/theme', {
         sections: { sobre: { ...sobre, animation: 'rebote', size: 110 } },
       });
@@ -256,13 +260,31 @@ describe('Perfil profesional, medios, certificados y prueba (e2e)', () => {
       await setPlan(id, 'PREMIUM');
       const full = {
         pagina: { background: '#f5f8fc' },
-        contacto: { background: '#0b1f3a', backgroundTo: '#3b82f6', text: '#ffffff', size: 115, animation: 'girar' },
+        contacto: {
+          background: '#0b1f3a',
+          backgroundTo: '#3b82f6',
+          text: '#ffffff',
+          size: 115,
+          animation: 'girar',
+        },
       };
-      const premium = await client.put('/professionals/me/theme', { color: 'azul', sections: full });
+      const premium = await client.put('/professionals/me/theme', {
+        color: 'azul',
+        sections: full,
+      });
       expect(premium.status).toBe(200);
       expect(premium.body.theme).toEqual({ color: 'azul', sections: full });
-      expect((await client.put('/professionals/me/theme', { sections: { datos: { size: 130 } } })).status).toBe(400);
-      expect((await client.put('/professionals/me/theme', { sections: { datos: { animation: 'explotar' } } })).status).toBe(400);
+      expect(
+        (await client.put('/professionals/me/theme', { sections: { datos: { size: 130 } } }))
+          .status,
+      ).toBe(400);
+      expect(
+        (
+          await client.put('/professionals/me/theme', {
+            sections: { datos: { animation: 'explotar' } },
+          })
+        ).status,
+      ).toBe(400);
     });
 
     it('profesiones según el plan, con una principal', async () => {

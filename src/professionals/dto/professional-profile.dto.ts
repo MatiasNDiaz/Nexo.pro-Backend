@@ -119,7 +119,10 @@ export class SectionStyleDto {
   @Matches(HEX_COLOR)
   background?: string;
 
-  @ApiPropertyOptional({ example: '#0b1f3a', description: 'Degradé con `background` (solo Premium)' })
+  @ApiPropertyOptional({
+    example: '#0b1f3a',
+    description: 'Degradé con `background` (solo Premium)',
+  })
   @IsOptional()
   @Transform(lower)
   @IsString()
@@ -146,17 +149,61 @@ export class SectionStyleDto {
 
 /** Una propiedad opcional por sección de THEME_SECTIONS: cualquier otra clave responde 400. */
 export class ThemeSectionsDto {
-  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) pagina?: SectionStyleDto;
-  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) presentacion?: SectionStyleDto;
-  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) datos?: SectionStyleDto;
-  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) sobre?: SectionStyleDto;
-  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) trabajos?: SectionStyleDto;
-  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) certificados?: SectionStyleDto;
-  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) resenas?: SectionStyleDto;
-  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) contacto?: SectionStyleDto;
-  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) zonas?: SectionStyleDto;
-  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) horarios?: SectionStyleDto;
-  @ApiPropertyOptional({ type: SectionStyleDto }) @IsOptional() @ValidateNested() @Type(() => SectionStyleDto) redes?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SectionStyleDto)
+  pagina?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SectionStyleDto)
+  presentacion?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SectionStyleDto)
+  datos?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SectionStyleDto)
+  sobre?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SectionStyleDto)
+  trabajos?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SectionStyleDto)
+  certificados?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SectionStyleDto)
+  resenas?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SectionStyleDto)
+  contacto?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SectionStyleDto)
+  zonas?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SectionStyleDto)
+  horarios?: SectionStyleDto;
+  @ApiPropertyOptional({ type: SectionStyleDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SectionStyleDto)
+  redes?: SectionStyleDto;
 }
 
 /** Personalización (opciones cerradas). Lo que el plan no admite responde 403. */
@@ -191,7 +238,8 @@ export class ProfileThemeDto {
 
   @ApiPropertyOptional({
     type: ThemeSectionsDto,
-    description: 'Estilo por sección (ADR 0034). Medium: fondo y letra; Premium: además degradé, tamaño y animación',
+    description:
+      'Estilo por sección (ADR 0034). Medium: fondo y letra; Premium: además degradé, tamaño y animación',
   })
   @IsOptional()
   @ValidateNested()

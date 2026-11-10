@@ -93,7 +93,12 @@ describe('personalización por plan', () => {
     const theme = {
       sections: {
         sobre: { background: '#123b7a', text: '#ffffff' },
-        contacto: { background: '#0b1f3a', backgroundTo: '#3b82f6', size: 110 as const, animation: 'rebote' as const },
+        contacto: {
+          background: '#0b1f3a',
+          backgroundTo: '#3b82f6',
+          size: 110 as const,
+          animation: 'rebote' as const,
+        },
       },
     };
     expect(themeFieldsNotAllowed(theme, ThemeLevel.NONE)).toEqual(['sections']);
@@ -121,7 +126,9 @@ describe('personalización por plan', () => {
     expect(themeForPlan(theme, ThemeLevel.NONE)).toEqual({});
     expect(themeForPlan(theme, ThemeLevel.EXTENDED)).toEqual(theme);
     // Un degradé sin color de inicio no se muestra.
-    expect(themeForPlan({ sections: { datos: { backgroundTo: '#000000' } } }, ThemeLevel.EXTENDED)).toEqual({});
+    expect(
+      themeForPlan({ sections: { datos: { backgroundTo: '#000000' } } }, ThemeLevel.EXTENDED),
+    ).toEqual({});
   });
 });
 
