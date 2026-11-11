@@ -39,34 +39,12 @@ import type {
   PublicMediaDto,
   PublicProfileDto,
 } from './dto/catalog.dto';
+import { LIVE_SUBSCRIPTION, VISIBLE } from './visibility';
 
-/**
- * Quién aparece en el catálogo (se calcula en cada consulta, sin columna `is_listed`): cuenta activa,
- * identidad aprobada (o aprobada con foto o nombre en revisión, ADR 0019 y 0021), prueba o plan
- * vigente, perfil activo y completo (foto, descripción, una profesión y una zona), y sin la
- * sanción "perfil oculto" vigente (C-29, ADR 0029).
- */
-const VISIBLE = `
-  p.deactivated_at IS NULL
-  AND u.role = 'PROFESSIONAL' AND u.status = 'ACTIVE' AND u.deleted_at IS NULL
-  AND (u.verification_status = 'APPROVED'
-       OR (u.verification_status = 'REQUIRES_REVIEW'
-           AND (u.pending_avatar_file_id IS NOT NULL OR u.pending_first_name IS NOT NULL)))
-  AND u.avatar_file_id IS NOT NULL AND p.bio IS NOT NULL
-  AND EXISTS (SELECT 1 FROM professional_professions pp
-               WHERE pp.professional_id = p.id AND pp.status = 'ACTIVE')
-  AND EXISTS (SELECT 1 FROM professional_service_areas a WHERE a.professional_id = p.id)
-  AND NOT EXISTS (SELECT 1 FROM sanctions sa
-                   WHERE sa.user_id = u.id AND sa.type = 'PROFILE_HIDDEN' AND sa.lifted_at IS NULL
-                     AND (sa.ends_at IS NULL OR sa.ends_at > now()))`;
-
-/** Suscripción vigente: una prueba o un período vencidos que la tarea todavía no marcó no cuentan. */
-const LIVE_SUBSCRIPTION = `
-  JOIN subscriptions s ON s.user_id = u.id
-   AND s.status IN ('TRIAL', 'ACTIVE')
-   AND (s.status <> 'TRIAL' OR s.trial_ends_at > now())
-   AND (s.status <> 'ACTIVE' OR s.current_period_end > now())
-  JOIN subscription_plans sp ON sp.id = s.plan_id`;
+/** Columnas de una fila del catálogo (búsqueda, página pública y vista previa). */
+const ROW_COLUMNS = `p.id, p.user_id, p.slug, u.first_name, u.last_name, p.business_name, p.bio,
+  p.years_experience, p.reference_rate, p.rate_mode, p.free_quote, u.avatar_file_id,
+  st.effective_status, sp.id AS plan_id, ${ratingColumns('u.id')}`;
 
 /** Hora de Córdoba. */
 const LOCAL = `(now() AT TIME ZONE '${ATTENTION_TIME_ZONE}')`;
@@ -114,7 +92,8 @@ interface CatalogRow {
   reference_rate: string | null;
   rate_mode: RateMode | null;
   free_quote: boolean;
-  avatar_file_id: string;
+  /** Siempre presente en el catálogo; puede faltar en la vista previa del dueño. */
+  avatar_file_id: string | null;
   effective_status: AttentionStatus;
   plan_id: string;
   rating_average: string | null;
@@ -173,10 +152,7 @@ export class CatalogService {
     const limit = param(query.limit);
     const offset = param((query.page - 1) * query.limit);
     const rows: CatalogRow[] = await this.dataSource.query(
-      `SELECT p.id, p.user_id, p.slug, u.first_name, u.last_name, p.business_name, p.bio,
-              p.years_experience, p.reference_rate, p.rate_mode, p.free_quote, u.avatar_file_id,
-              st.effective_status, sp.id AS plan_id, ${ratingColumns('u.id')},
-              count(*) OVER () AS total
+      `SELECT ${ROW_COLUMNS}, count(*) OVER () AS total
          FROM professional_profiles p
          JOIN users u ON u.id = p.user_id
          ${LIVE_SUBSCRIPTION}
@@ -222,9 +198,7 @@ export class CatalogService {
     viewer?: MetricsViewer | null,
   ): Promise<PublicProfileDto> {
     const rows: CatalogRow[] = await this.dataSource.query(
-      `SELECT p.id, p.user_id, p.slug, u.first_name, u.last_name, p.business_name, p.bio,
-              p.years_experience, p.reference_rate, p.rate_mode, p.free_quote, u.avatar_file_id,
-              st.effective_status, sp.id AS plan_id, ${ratingColumns('u.id')}, 1 AS total
+      `SELECT ${ROW_COLUMNS}, 1 AS total
          FROM professional_profiles p
          JOIN users u ON u.id = p.user_id
          ${LIVE_SUBSCRIPTION}
@@ -238,14 +212,44 @@ export class CatalogService {
     if (viewer) {
       this.metrics.recordProfileView({ profileId: rows[0].id, userId: rows[0].user_id }, viewer);
     }
-    const [item] = await this.hydrate(rows);
-    const id = rows[0].id;
+    return this.build(rows[0], now);
+  }
+
+  /**
+   * La página del profesional tal como se vería publicada, aunque todavía no lo esté (vista previa del
+   * dueño, decisión del fundador del 2026-11-11). No cuenta como visita. Muestra lo que permite su
+   * prueba o plan vigente; sin ninguno, lo del plan Basic (lo mínimo que tendría al publicarse).
+   * `null` si no tiene perfil profesional.
+   */
+  async ownerPreview(userId: string, now = new Date()): Promise<PublicProfileDto | null> {
+    const rows: CatalogRow[] = await this.dataSource.query(
+      `SELECT ${ROW_COLUMNS}, 1 AS total
+         FROM professional_profiles p
+         JOIN users u ON u.id = p.user_id
+         JOIN subscription_plans sp ON sp.id = COALESCE(
+           (SELECT s.plan_id FROM subscriptions s
+             WHERE s.user_id = u.id AND s.status IN ('TRIAL', 'ACTIVE')
+               AND (s.status <> 'TRIAL' OR s.trial_ends_at > now())
+               AND (s.status <> 'ACTIVE' OR s.current_period_end > now())
+             ORDER BY s.created_at DESC LIMIT 1),
+           (SELECT b.id FROM subscription_plans b WHERE b.code = 'BASIC'))
+         CROSS JOIN LATERAL (SELECT ${EFFECTIVE_STATUS} AS effective_status) st
+        WHERE u.id = $1 AND u.role = 'PROFESSIONAL' AND u.deleted_at IS NULL`,
+      [userId],
+    );
+    return rows[0] ? this.build(rows[0], now) : null;
+  }
+
+  /** Página completa a partir de la fila (respeta los límites del plan de la fila). */
+  private async build(row: CatalogRow, now: Date): Promise<PublicProfileDto> {
+    const [item] = await this.hydrate([row]);
+    const id = row.id;
     const manager = this.dataSource.manager;
     const [profile, user, plan, media, certifications, links, slots, exceptions] =
       await Promise.all([
         manager.getRepository(ProfessionalProfile).findOneByOrFail({ id }),
-        manager.getRepository(User).findOneByOrFail({ id: rows[0].user_id }),
-        manager.getRepository(SubscriptionPlan).findOneByOrFail({ id: rows[0].plan_id }),
+        manager.getRepository(User).findOneByOrFail({ id: row.user_id }),
+        manager.getRepository(SubscriptionPlan).findOneByOrFail({ id: row.plan_id }),
         manager.getRepository(ProfessionalMedia).find({
           where: { professionalId: id, status: MediaStatus.ACTIVE },
           relations: { file: true },
@@ -361,7 +365,10 @@ export class CatalogService {
         .getRepository(SubscriptionPlan)
         .findBy({ id: In([...new Set(rows.map((row) => row.plan_id))]) }),
     ]);
-    const avatars = await this.uploads.publicUrls(rows.map((row) => row.avatar_file_id));
+    // En la vista previa del dueño la foto puede faltar todavía.
+    const avatars = await this.uploads.publicUrls(
+      rows.flatMap((row) => (row.avatar_file_id ? [row.avatar_file_id] : [])),
+    );
 
     return rows.map((row) => {
       const plan = plans.find((p) => p.id === row.plan_id);
@@ -375,7 +382,7 @@ export class CatalogService {
         firstName: row.first_name,
         lastName: row.last_name,
         businessName: row.business_name,
-        avatarUrl: avatars.get(row.avatar_file_id) ?? null,
+        avatarUrl: row.avatar_file_id ? (avatars.get(row.avatar_file_id) ?? null) : null,
         bio: row.bio,
         yearsExperience: row.years_experience,
         referenceRate: row.reference_rate,

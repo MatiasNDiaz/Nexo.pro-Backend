@@ -9,6 +9,7 @@ import {
   SocialNetwork,
 } from '../../professionals/professional.enums';
 import { ProfileThemeDto } from '../../professionals/dto/professional-profile.dto';
+import { PublicationRequirement } from '../visibility';
 
 export class CatalogQueryDto {
   @ApiPropertyOptional({ format: 'uuid' })
@@ -88,8 +89,11 @@ export class CatalogItemDto {
   @ApiProperty() freeQuote: boolean;
   @ApiProperty({ enum: AttentionStatus, description: 'Estado que se muestra ahora' })
   attentionStatus: AttentionStatus;
-  @ApiProperty({ description: 'Siempre true: el catálogo solo muestra identidades aprobadas' })
-  identityVerified: true;
+  @ApiProperty({
+    description:
+      'Siempre true en el catálogo (solo muestra identidades aprobadas); en la vista previa del dueño, el estado real',
+  })
+  identityVerified: boolean;
   @ApiProperty({ type: [PublicProfessionDto] }) professions: PublicProfessionDto[];
   @ApiProperty({ type: [PublicAreaDto] }) serviceAreas: PublicAreaDto[];
   @ApiProperty({ nullable: true, type: String, description: 'Primera imagen de presentación' })
@@ -152,4 +156,18 @@ export class PublicProfileDto extends CatalogItemDto {
   @ApiProperty({ type: [PublicCertificationDto] }) certifications: PublicCertificationDto[];
   @ApiProperty({ type: [PublicSocialLinkDto] }) socialLinks: PublicSocialLinkDto[];
   @ApiProperty({ type: PublicAvailabilityDto }) availability: PublicAvailabilityDto;
+}
+
+/** Vista previa de la página propia (decisión del fundador del 2026-11-11). Solo la ve el dueño. */
+export class OwnPublicPageDto {
+  @ApiProperty({ description: 'true si cualquiera puede verla (y compartir el enlace)' })
+  published: boolean;
+  @ApiProperty({
+    enum: PublicationRequirement,
+    isArray: true,
+    description: 'Lo que falta para publicarla, en el orden en que conviene resolverlo',
+  })
+  missing: PublicationRequirement[];
+  @ApiProperty({ type: PublicProfileDto, description: 'Cómo se ve (o se vería) publicada' })
+  profile: PublicProfileDto;
 }

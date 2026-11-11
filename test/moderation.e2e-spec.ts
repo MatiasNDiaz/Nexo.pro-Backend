@@ -388,9 +388,59 @@ describe('Moderación, soporte y panel del admin (e2e)', () => {
     expect(typeof dashboard.openReports).toBe('number');
 
     const found = (await admin.get(`/admin/users?q=${encodeURIComponent(customer.email)}`)).body;
-    expect(found.data).toEqual([expect.objectContaining({ id: customer.id })]);
+    expect(found.data).toEqual([
+      expect.objectContaining({
+        id: customer.id,
+        google: false,
+        hasPassword: true,
+        professional: null,
+        activeStrikeWeight: 1,
+        activeSanctions: 0,
+        reportsAgainst: 0,
+      }),
+    ]);
     const detail = (await admin.get(`/admin/users/${customer.id}`)).body;
-    expect(detail).toMatchObject({ email: customer.email, activeStrikeWeight: 1 });
+    expect(detail).toMatchObject({
+      email: customer.email,
+      activeStrikeWeight: 1,
+      publicationMissing: null,
+    });
     expect((await customer.client.get('/admin/dashboard')).status).toBe(403);
+  });
+
+  it('panel: la búsqueda combina filtros y ordena por los más nuevos', async () => {
+    const customer = await signInCustomer(app);
+    await admin.post(`/admin/users/${customer.id}/strikes`, { weight: 1, reason: 'Llegó tarde' });
+    const pro = await listedProfessional(app);
+    const ids = async (query: string) =>
+      ((await admin.get(`/admin/users?${query}`)).body as { data: Array<{ id: string }> }).data.map(
+        (u) => u.id,
+      );
+    const q = (email: string) => `q=${encodeURIComponent(email)}`;
+
+    // El recién creado aparece primero sin ningún filtro.
+    expect((await ids('limit=1'))[0]).toBe(pro.id);
+    expect(await ids(`${q(customer.email)}&flags=strikes&joined=today`)).toEqual([customer.id]);
+    expect(await ids(`${q(customer.email)}&flags=strikes,sanctioned`)).toEqual([]);
+    expect(await ids(`${q(customer.email)}&role=PROFESSIONAL`)).toEqual([]);
+    expect(await ids(`${q(pro.email)}&pageState=published&plan=TRIAL&login=password`)).toEqual([
+      pro.id,
+    ]);
+    expect(await ids(`${q(pro.email)}&pageState=unpublished`)).toEqual([]);
+    expect(await ids(`${q(pro.email)}&plan=PREMIUM`)).toEqual([]);
+    for (const sort of ['oldest', 'name', 'last_login']) {
+      expect((await admin.get(`/admin/users?sort=${sort}`)).status).toBe(200);
+    }
+    expect((await admin.get('/admin/users?flags=nada')).status).toBe(400);
+
+    const [item] = (await admin.get(`/admin/users?${q(pro.email)}`)).body.data;
+    expect(item.avatarUrl).toEqual(expect.any(String));
+    expect(item.professional).toMatchObject({
+      published: true,
+      subscriptionStatus: 'TRIAL',
+      professions: [expect.any(String)],
+    });
+    const detail = (await admin.get(`/admin/users/${pro.id}`)).body;
+    expect(detail).toMatchObject({ publicationMissing: [], professional: { published: true } });
   });
 });

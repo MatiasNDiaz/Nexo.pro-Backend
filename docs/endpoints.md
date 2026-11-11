@@ -167,6 +167,7 @@ recurso (anti-IDOR) la valida cada servicio; ver `docs/revision-seguridad.md`.
 | `GET /api/v1/professionals/me/metrics` | PROFESSIONAL | ACTIVE | — | — | global |
 | `PUT /api/v1/professionals/me/professions` | PROFESSIONAL | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
 | `PUT /api/v1/professionals/me/professions/visible` | PROFESSIONAL | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
+| `GET /api/v1/professionals/me/public-page` | PROFESSIONAL | PENDING_VERIFICATION, ACTIVE | — | — | global |
 | `PUT /api/v1/professionals/me/service-areas` | PROFESSIONAL | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
 | `PUT /api/v1/professionals/me/social-links` | PROFESSIONAL | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
 | `PUT /api/v1/professionals/me/theme` | PROFESSIONAL | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
