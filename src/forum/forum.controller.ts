@@ -20,11 +20,21 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { type AuthUser, CurrentUser, Public, Roles } from '../common/decorators';
+import {
+  AllowAccountStates,
+  type AuthUser,
+  CurrentUser,
+  Public,
+  Roles,
+} from '../common/decorators';
 import { HideContentDto } from '../professionals/dto/professional-profile.dto';
+import { CustomersService } from './customers.service';
 import {
   CreateForumPostDto,
   CreateForumReplyDto,
+  CustomerCardDto,
+  CustomerDirectoryPageDto,
+  CustomerDirectoryQueryDto,
   ForumLikesDto,
   ForumPageDto,
   ForumPostDetailDto,
@@ -181,6 +191,33 @@ export class ForumController {
   @Roles('CUSTOMER', 'PROFESSIONAL')
   unlikeReply(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.forum.likeReply(user, id, false);
+  }
+}
+
+/**
+ * "Clientes" (pedido del fundador del 2026-11-11, ADR 0037): cualquier profesional con sesión ve el
+ * catálogo de clientes activos y abre la ficha de cada uno; sus publicaciones se piden al foro con
+ * `GET /forum/posts?authorId=`. Límite por minuto para que la lista no se pueda copiar entera.
+ */
+@ApiTags('customers')
+@ApiCookieAuth()
+@Roles('PROFESSIONAL')
+@AllowAccountStates('PENDING_VERIFICATION', 'ACTIVE')
+@Throttle({ default: { limit: 60, ttl: 60_000 } })
+@Controller({ path: 'customers', version: '1' })
+export class CustomersController {
+  constructor(private readonly customers: CustomersService) {}
+
+  @Get()
+  @ApiOkResponse({ type: CustomerDirectoryPageDto })
+  list(@Query() query: CustomerDirectoryQueryDto): Promise<CustomerDirectoryPageDto> {
+    return this.customers.list(query);
+  }
+
+  @Get(':userId')
+  @ApiOkResponse({ type: CustomerCardDto })
+  card(@Param('userId', ParseUUIDPipe) userId: string): Promise<CustomerCardDto> {
+    return this.customers.card(userId);
   }
 }
 

@@ -80,6 +80,7 @@ export class ForumService {
       .createQueryBuilder('p')
       .where('p.deletedAt IS NULL AND p.status = :visible', { visible: ContentStatus.VISIBLE });
     if (query.type) builder.andWhere('p.type = :type', { type: query.type });
+    if (query.authorId) builder.andWhere('p.authorId = :author', { author: query.authorId });
     if (query.localityId)
       builder.andWhere('p.localityId = :locality', { locality: query.localityId });
     if (query.resolved !== undefined) {

@@ -109,6 +109,8 @@ recurso (anti-IDOR) la valida cada servicio; ver `docs/revision-seguridad.md`.
 | `POST /api/v1/contracts/:id/complete` | PROFESSIONAL | ACTIVE | Sí | Sí | global |
 | `POST /api/v1/contracts/:id/schedule` | PROFESSIONAL | ACTIVE | Sí | Sí | global |
 | `POST /api/v1/contracts/:id/start` | PROFESSIONAL | ACTIVE | Sí | Sí | global |
+| `GET /api/v1/customers` | PROFESSIONAL | PENDING_VERIFICATION, ACTIVE | — | — | global |
+| `GET /api/v1/customers/:userId` | PROFESSIONAL | PENDING_VERIFICATION, ACTIVE | — | — | global |
 | `GET /api/v1/customers/me` | CUSTOMER | PENDING_VERIFICATION, ACTIVE | — | — | global |
 | `PATCH /api/v1/customers/me` | CUSTOMER | PENDING_VERIFICATION, ACTIVE | Sí | Sí | global |
 | `GET /api/v1/evidence/:fileId` | CUSTOMER, PROFESSIONAL, ADMIN | ACTIVE | — | — | global |

@@ -182,6 +182,14 @@ export class ForumQueryDto {
   @IsBoolean()
   resolved?: boolean;
 
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Solo las de esta persona (la ficha de un cliente en "Clientes")',
+  })
+  @IsOptional()
+  @IsUUID()
+  authorId?: string;
+
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -196,6 +204,50 @@ export class ForumQueryDto {
   @Min(1)
   @Max(50)
   limit = 20;
+}
+
+/**
+ * Catálogo de clientes para profesionales (pedido del fundador del 2026-11-11, ADR 0037): todos los
+ * clientes activos, con lo mismo que ya es público en el foro.
+ */
+export class CustomerDirectoryQueryDto {
+  @ApiPropertyOptional({ minLength: 2, maxLength: 60, description: 'Nombre o apellido' })
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @Length(2, 60)
+  q?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Publicó algo con ese oficio' })
+  @IsOptional()
+  @IsUUID()
+  professionId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Publicó algo en esa localidad' })
+  @IsOptional()
+  @IsUUID()
+  localityId?: string;
+
+  @ApiPropertyOptional({ description: 'Solo con "Solicito profesional" sin resolver' })
+  @IsOptional()
+  @Transform(toBoolean)
+  @IsBoolean()
+  withOpenRequests?: boolean;
+
+  @ApiPropertyOptional({ default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page = 1;
+
+  @ApiPropertyOptional({ default: 24 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(48)
+  limit = 24;
 }
 
 export class ForumAuthorDto {
@@ -263,4 +315,28 @@ export class ForumPageDto {
 export class ForumLikesDto {
   @ApiProperty() post: boolean;
   @ApiProperty({ type: [String] }) replyIds: string[];
+}
+
+/** Sin teléfono, email ni barrio de la cuenta: solo lo que el foro ya muestra y lo que publicó. */
+export class CustomerCardDto {
+  @ApiProperty({ format: 'uuid' }) userId: string;
+  @ApiProperty() firstName: string;
+  @ApiProperty() lastName: string;
+  @ApiProperty({ nullable: true, type: String }) avatarUrl: string | null;
+  @ApiProperty({ description: 'Fecha de registro' }) memberSince: Date;
+  @ApiProperty({ description: 'Publicaciones visibles en el foro' }) postCount: number;
+  @ApiProperty({ description: '"Solicito profesional" sin resolver' }) openRequestCount: number;
+  @ApiProperty({ nullable: true, type: Date, description: 'Su publicación más reciente' })
+  lastPostAt: Date | null;
+  @ApiProperty({ type: [NamedRefDto], description: 'Oficios de sus publicaciones' })
+  professions: NamedRefDto[];
+  @ApiProperty({ type: [NamedRefDto], description: 'Localidades de sus publicaciones' })
+  localities: NamedRefDto[];
+}
+
+export class CustomerDirectoryPageDto {
+  @ApiProperty({ type: [CustomerCardDto] }) data: CustomerCardDto[];
+  @ApiProperty() page: number;
+  @ApiProperty() limit: number;
+  @ApiProperty() total: number;
 }
